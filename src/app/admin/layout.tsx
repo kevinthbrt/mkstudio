@@ -14,13 +14,16 @@ export default async function AdminLayout({
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("user_id", user.id)
     .single();
 
-  if (!profile || profile.role !== "admin") redirect("/dashboard");
+  // DB not set up yet or profile missing
+  if (error || !profile) redirect("/setup");
+
+  if (profile.role !== "admin") redirect("/dashboard");
 
   return (
     <DashboardLayout profile={profile} title="Administration">
