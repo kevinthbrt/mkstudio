@@ -1,0 +1,309 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          first_name: string;
+          last_name: string;
+          email: string;
+          phone: string | null;
+          role: "admin" | "member";
+          session_balance: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          first_name: string;
+          last_name: string;
+          email: string;
+          phone?: string | null;
+          role?: "admin" | "member";
+          session_balance?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          first_name?: string;
+          last_name?: string;
+          email?: string;
+          phone?: string | null;
+          role?: "admin" | "member";
+          session_balance?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          price: number;
+          session_count: number;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          price: number;
+          session_count: number;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          price?: number;
+          session_count?: number;
+          active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      orders: {
+        Row: {
+          id: string;
+          member_id: string;
+          product_id: string;
+          amount: number;
+          sessions_purchased: number;
+          invoice_number: string;
+          status: "pending" | "paid" | "cancelled";
+          created_at: string;
+          paid_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          product_id: string;
+          amount: number;
+          sessions_purchased: number;
+          invoice_number?: string;
+          status?: "pending" | "paid" | "cancelled";
+          created_at?: string;
+          paid_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          product_id?: string;
+          amount?: number;
+          sessions_purchased?: number;
+          invoice_number?: string;
+          status?: "pending" | "paid" | "cancelled";
+          paid_at?: string | null;
+        };
+        Relationships: [];
+      };
+      invoice_settings: {
+        Row: {
+          id: string;
+          business_name: string;
+          owner_name: string;
+          address: string;
+          city: string;
+          postal_code: string;
+          country: string;
+          email: string;
+          phone: string;
+          siret: string;
+          ape_code: string | null;
+          tva_mention: string;
+          payment_terms: string;
+          invoice_prefix: string;
+          next_invoice_number: number;
+          logo_url: string | null;
+          bank_details: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_name: string;
+          owner_name: string;
+          address: string;
+          city: string;
+          postal_code: string;
+          country?: string;
+          email: string;
+          phone: string;
+          siret: string;
+          ape_code?: string | null;
+          tva_mention?: string;
+          payment_terms?: string;
+          invoice_prefix?: string;
+          next_invoice_number?: number;
+          logo_url?: string | null;
+          bank_details?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          business_name?: string;
+          owner_name?: string;
+          address?: string;
+          city?: string;
+          postal_code?: string;
+          country?: string;
+          email?: string;
+          phone?: string;
+          siret?: string;
+          ape_code?: string | null;
+          tva_mention?: string;
+          payment_terms?: string;
+          invoice_prefix?: string;
+          next_invoice_number?: number;
+          logo_url?: string | null;
+          bank_details?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      class_types: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          color: string;
+          duration_minutes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          color?: string;
+          duration_minutes: number;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+          color?: string;
+          duration_minutes?: number;
+        };
+        Relationships: [];
+      };
+      class_sessions: {
+        Row: {
+          id: string;
+          class_type_id: string;
+          coach_name: string;
+          start_time: string;
+          end_time: string;
+          max_participants: number;
+          current_participants: number;
+          min_cancel_hours: number;
+          is_cancelled: boolean;
+          recurring_rule: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          class_type_id: string;
+          coach_name: string;
+          start_time: string;
+          end_time: string;
+          max_participants: number;
+          current_participants?: number;
+          min_cancel_hours?: number;
+          is_cancelled?: boolean;
+          recurring_rule?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          class_type_id?: string;
+          coach_name?: string;
+          start_time?: string;
+          end_time?: string;
+          max_participants?: number;
+          current_participants?: number;
+          min_cancel_hours?: number;
+          is_cancelled?: boolean;
+          recurring_rule?: string | null;
+        };
+        Relationships: [];
+      };
+      class_bookings: {
+        Row: {
+          id: string;
+          member_id: string;
+          class_session_id: string;
+          status: "confirmed" | "cancelled";
+          session_debited: boolean;
+          booked_at: string;
+          cancelled_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          class_session_id: string;
+          status?: "confirmed" | "cancelled";
+          session_debited?: boolean;
+          booked_at?: string;
+          cancelled_at?: string | null;
+        };
+        Update: {
+          status?: "confirmed" | "cancelled";
+          session_debited?: boolean;
+          cancelled_at?: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]?: never;
+    };
+    Functions: {
+      increment_session_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      decrement_session_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      increment_participants: {
+        Args: { session_id: string };
+        Returns: undefined;
+      };
+      decrement_participants: {
+        Args: { session_id: string };
+        Returns: undefined;
+      };
+    };
+    Enums: {
+      [_ in never]?: never;
+    };
+    CompositeTypes: {
+      [_ in never]?: never;
+    };
+  };
+}
+
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type InvoiceSettings = Database["public"]["Tables"]["invoice_settings"]["Row"];
+export type ClassType = Database["public"]["Tables"]["class_types"]["Row"];
+export type ClassSession = Database["public"]["Tables"]["class_sessions"]["Row"];
+export type ClassBooking = Database["public"]["Tables"]["class_bookings"]["Row"];
