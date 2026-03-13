@@ -39,9 +39,9 @@ export default function SetupPage() {
       return;
     }
 
-    if (!profile) {
-      // Table exists but no profile for this user
-      setStep("no_profile");
+    if (error || !profile) {
+      // Table exists but profile missing or RLS error — auto-fix via API
+      await createProfile();
       return;
     }
 
