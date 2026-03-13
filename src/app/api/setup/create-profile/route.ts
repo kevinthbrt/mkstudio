@@ -15,25 +15,34 @@ export async function POST() {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  // Check if profile already exists
-  const { data: existing } = await supabase
+  const isAdmin = ADMIN_EMAILS.includes(user.email || "");
+  const role = isAdmin ? "admin" : "member";
+
+  // Use admin client to bypass RLS for all profile operations
+  const admin = createAdminClient();
+
+  // Check if profile already exists (admin client bypasses RLS)
+  const { data: existing } = await admin
     .from("profiles")
     .select("id, role")
     .eq("user_id", user.id)
     .single();
 
   if (existing) {
+    // Update role if this user should be admin
+    if (isAdmin && existing.role !== "admin") {
+      await admin.from("profiles").update({ role: "admin" }).eq("id", existing.id);
+      return NextResponse.json({
+        message: "Profil mis à jour ! Rôle : Administrateur",
+        role: "admin",
+      });
+    }
     return NextResponse.json({
       message: "Profil déjà existant",
       role: existing.role,
     });
   }
 
-  const isAdmin = ADMIN_EMAILS.includes(user.email || "");
-  const role = isAdmin ? "admin" : "member";
-
-  // Use admin client to bypass RLS for profile creation
-  const admin = createAdminClient();
   const { error } = await admin.from("profiles").insert({
     user_id: user.id,
     first_name: user.user_metadata?.first_name || user.email?.split("@")[0] || "Utilisateur",
