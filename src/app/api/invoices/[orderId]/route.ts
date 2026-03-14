@@ -374,14 +374,27 @@ export async function GET(
     return NextResponse.json({ error: "Données manquantes" }, { status: 500 });
   }
 
-  if (!settings) {
-    return NextResponse.json(
-      { error: "Paramètres de facturation non configurés" },
-      { status: 400 }
-    );
-  }
+  // Use fallback settings if not configured yet
+  const effectiveSettings = settings ?? {
+    business_name: "MK Studio",
+    owner_name: "MK Studio",
+    address: "",
+    postal_code: "",
+    city: "",
+    country: "France",
+    email: "",
+    phone: "",
+    siret: "À configurer",
+    ape_code: null,
+    tva_mention: "TVA non applicable, art. 293 B du CGI",
+    payment_terms: "Paiement à réception de facture",
+    invoice_prefix: "MKS",
+    next_invoice_number: 1,
+    logo_url: null,
+    bank_details: null,
+  };
 
-  const html = generateInvoiceHTML(order, member, product, settings);
+  const html = generateInvoiceHTML(order, member, product, effectiveSettings);
 
   return new NextResponse(html, {
     headers: {
