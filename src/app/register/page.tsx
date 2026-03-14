@@ -31,6 +31,10 @@ export default function RegisterPage() {
       setError("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
+    if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError("Le mot de passe doit contenir au moins une majuscule et un chiffre.");
+      return;
+    }
 
     setLoading(true);
     const supabase = createClient();

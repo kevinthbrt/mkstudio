@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Get product
   const { data: product } = await supabase
     .from("products")
     .select("*")
@@ -42,7 +41,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Produit introuvable" }, { status: 404 });
   }
 
-  // Get invoice settings for invoice number
   const { data: invoiceSettings } = await supabase
     .from("invoice_settings")
     .select("*")
@@ -50,9 +48,8 @@ export async function POST(request: NextRequest) {
 
   const invoiceNumber = invoiceSettings
     ? `${invoiceSettings.invoice_prefix}-${String(invoiceSettings.next_invoice_number).padStart(4, "0")}`
-    : `INV-${Date.now()}`;
+    : `INV-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-  // Create order
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -68,26 +65,32 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (orderError) {
-    return NextResponse.json({ error: orderError.message }, { status: 500 });
+    console.error("[admin/orders] insert error:", orderError.message);
+    return NextResponse.json({ error: "Une erreur est survenue lors de la création de la vente." }, { status: 500 });
   }
 
-  // Update member balance
+  // Credit the correct balance based on product type
   const { data: member } = await supabase
     .from("profiles")
-    .select("session_balance")
+    .select("collective_balance, individual_balance")
     .eq("id", member_id)
     .single();
 
   if (member) {
-    await supabase
-      .from("profiles")
-      .update({
-        session_balance: member.session_balance + product.session_count,
-      })
-      .eq("id", member_id);
+    const sessionType = product.session_type || "collective";
+    if (sessionType === "individual") {
+      await supabase
+        .from("profiles")
+        .update({ individual_balance: member.individual_balance + product.session_count })
+        .eq("id", member_id);
+    } else {
+      await supabase
+        .from("profiles")
+        .update({ collective_balance: member.collective_balance + product.session_count })
+        .eq("id", member_id);
+    }
   }
 
-  // Increment invoice counter
   if (invoiceSettings) {
     await supabase
       .from("invoice_settings")

@@ -12,11 +12,11 @@ import {
   Plus,
   Search,
   Zap,
-  User,
-  Phone,
   Mail,
+  Phone,
   PlusCircle,
   MinusCircle,
+  Gift,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Profile } from "@/types/database";
@@ -27,7 +27,11 @@ export default function MembersPage() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
-  const [adjustBalance, setAdjustBalance] = useState({ show: false, delta: 1 });
+
+  // Adjust balance state
+  const [adjustMode, setAdjustMode] = useState<"none" | "collective" | "individual" | "credit">("none");
+  const [adjustDelta, setAdjustDelta] = useState(1);
+  const [adjusting, setAdjusting] = useState(false);
 
   const [newMember, setNewMember] = useState({
     first_name: "",
@@ -38,7 +42,6 @@ export default function MembersPage() {
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
-  const [adjusting, setAdjusting] = useState(false);
 
   useEffect(() => {
     loadMembers();
@@ -71,43 +74,66 @@ export default function MembersPage() {
       setCreateError(data.error || "Erreur lors de la création");
     } else {
       setShowCreate(false);
-      setNewMember({
-        first_name: "",
-        last_name: "",
-        email: "",
-        phone: "",
-        password: "",
-      });
+      setNewMember({ first_name: "", last_name: "", email: "", phone: "", password: "" });
       loadMembers();
     }
     setCreating(false);
   }
 
-  async function handleAdjustBalance() {
+  // Direct balance adjustment (no invoice)
+  async function handleAdjustBalance(type: "collective" | "individual") {
     if (!selectedMember) return;
     setAdjusting(true);
 
-    const supabase = createClient();
-    const newBalance = Math.max(
-      0,
-      selectedMember.session_balance + adjustBalance.delta
-    );
+    const field = type === "individual" ? "individual_balance" : "collective_balance";
+    const current = type === "individual"
+      ? selectedMember.individual_balance
+      : selectedMember.collective_balance;
+    const newBalance = Math.max(0, current + adjustDelta);
 
+    const supabase = createClient();
     await supabase
       .from("profiles")
-      .update({ session_balance: newBalance })
+      .update({ [field]: newBalance })
       .eq("id", selectedMember.id);
 
-    setMembers((m) =>
-      m.map((member) =>
-        member.id === selectedMember.id
-          ? { ...member, session_balance: newBalance }
-          : member
-      )
-    );
-    setSelectedMember({ ...selectedMember, session_balance: newBalance });
+    const updated = {
+      ...selectedMember,
+      [field]: newBalance,
+    };
+    setMembers((m) => m.map((mb) => (mb.id === selectedMember.id ? updated : mb)));
+    setSelectedMember(updated);
     setAdjusting(false);
-    setAdjustBalance({ show: false, delta: 1 });
+    setAdjustMode("none");
+    setAdjustDelta(1);
+  }
+
+  // Credit without invoice via API
+  async function handleDirectCredit(type: "collective" | "individual") {
+    if (!selectedMember) return;
+    setAdjusting(true);
+
+    const res = await fetch("/api/admin/credit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        member_id: selectedMember.id,
+        session_type: type,
+        amount: adjustDelta,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const field = type === "individual" ? "individual_balance" : "collective_balance";
+      const updated = { ...selectedMember, [field]: data.new_balance };
+      setMembers((m) => m.map((mb) => (mb.id === selectedMember.id ? updated : mb)));
+      setSelectedMember(updated);
+    }
+
+    setAdjusting(false);
+    setAdjustMode("none");
+    setAdjustDelta(1);
   }
 
   const filtered = members.filter((m) => {
@@ -142,7 +168,6 @@ export default function MembersPage() {
         </Button>
       </div>
 
-      {/* Search */}
       <Input
         placeholder="Rechercher un adhérent..."
         value={search}
@@ -150,7 +175,6 @@ export default function MembersPage() {
         icon={<Search size={16} />}
       />
 
-      {/* Members list */}
       {filtered.length === 0 ? (
         <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-10 text-center">
           <Users size={32} className="text-gray-600 mx-auto mb-3" />
@@ -165,7 +189,11 @@ export default function MembersPage() {
               key={member.id}
               hover
               className="p-4"
-              onClick={() => setSelectedMember(member)}
+              onClick={() => {
+                setSelectedMember(member);
+                setAdjustMode("none");
+                setAdjustDelta(1);
+              }}
             >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#B8941E] flex items-center justify-center flex-shrink-0">
@@ -178,14 +206,20 @@ export default function MembersPage() {
                   <p className="text-white font-semibold text-sm">
                     {member.first_name} {member.last_name}
                   </p>
-                  <p className="text-gray-500 text-xs truncate">
-                    {member.email}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <Zap size={12} className="text-[#D4AF37]" />
-                    <span className="text-[#D4AF37] text-xs font-semibold">
-                      {member.session_balance} séance(s)
-                    </span>
+                  <p className="text-gray-500 text-xs truncate">{member.email}</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-1">
+                      <Users size={11} className="text-[#D4AF37]" />
+                      <span className="text-[#D4AF37] text-xs font-semibold">
+                        {member.collective_balance}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Zap size={11} className="text-blue-400" />
+                      <span className="text-blue-400 text-xs font-semibold">
+                        {member.individual_balance}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -213,17 +247,13 @@ export default function MembersPage() {
             <Input
               label="Prénom"
               value={newMember.first_name}
-              onChange={(e) =>
-                setNewMember({ ...newMember, first_name: e.target.value })
-              }
+              onChange={(e) => setNewMember({ ...newMember, first_name: e.target.value })}
               required
             />
             <Input
               label="Nom"
               value={newMember.last_name}
-              onChange={(e) =>
-                setNewMember({ ...newMember, last_name: e.target.value })
-              }
+              onChange={(e) => setNewMember({ ...newMember, last_name: e.target.value })}
               required
             />
           </div>
@@ -231,9 +261,7 @@ export default function MembersPage() {
             label="Email"
             type="email"
             value={newMember.email}
-            onChange={(e) =>
-              setNewMember({ ...newMember, email: e.target.value })
-            }
+            onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
             icon={<Mail size={14} />}
             required
           />
@@ -241,18 +269,14 @@ export default function MembersPage() {
             label="Téléphone (optionnel)"
             type="tel"
             value={newMember.phone}
-            onChange={(e) =>
-              setNewMember({ ...newMember, phone: e.target.value })
-            }
+            onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
             icon={<Phone size={14} />}
           />
           <Input
             label="Mot de passe temporaire"
             type="password"
             value={newMember.password}
-            onChange={(e) =>
-              setNewMember({ ...newMember, password: e.target.value })
-            }
+            onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
             required
           />
 
@@ -263,12 +287,7 @@ export default function MembersPage() {
           )}
 
           <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex-1"
-              onClick={() => setShowCreate(false)}
-            >
+            <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowCreate(false)}>
               Annuler
             </Button>
             <Button type="submit" loading={creating} className="flex-1">
@@ -284,7 +303,8 @@ export default function MembersPage() {
           open={!!selectedMember}
           onClose={() => {
             setSelectedMember(null);
-            setAdjustBalance({ show: false, delta: 1 });
+            setAdjustMode("none");
+            setAdjustDelta(1);
           }}
           title="Fiche adhérent"
           size="lg"
@@ -302,81 +322,103 @@ export default function MembersPage() {
                 <p className="text-white font-bold text-lg">
                   {selectedMember.first_name} {selectedMember.last_name}
                 </p>
-                <p className="text-gray-500 text-sm">
-                  {selectedMember.email}
-                </p>
+                <p className="text-gray-500 text-sm">{selectedMember.email}</p>
                 {selectedMember.phone && (
-                  <p className="text-gray-500 text-sm">
-                    {selectedMember.phone}
-                  </p>
+                  <p className="text-gray-500 text-sm">{selectedMember.phone}</p>
                 )}
               </div>
             </div>
 
-            {/* Balance */}
-            <div className="bg-[#1a1a1a] rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Solde de séances</p>
-                <p className="text-4xl font-bold text-white mt-1">
-                  {selectedMember.session_balance}
+            {/* Two balances */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#1a1a1a] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users size={14} className="text-[#D4AF37]" />
+                  <p className="text-gray-400 text-xs">Solde collectif</p>
+                </div>
+                <p className="text-3xl font-bold text-white">
+                  {selectedMember.collective_balance}
                 </p>
+                <p className="text-gray-600 text-xs mt-1">séances</p>
               </div>
-              <Zap size={32} className="text-[#D4AF37]" />
+              <div className="bg-[#1a1a1a] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap size={14} className="text-blue-400" />
+                  <p className="text-gray-400 text-xs">Solde individuel</p>
+                </div>
+                <p className="text-3xl font-bold text-white">
+                  {selectedMember.individual_balance}
+                </p>
+                <p className="text-gray-600 text-xs mt-1">séances</p>
+              </div>
             </div>
 
-            {/* Adjust balance */}
-            {!adjustBalance.show ? (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setAdjustBalance({ show: true, delta: 1 })}
-              >
-                <Zap size={16} />
-                Ajuster le solde manuellement
-              </Button>
-            ) : (
+            {/* Action buttons */}
+            {adjustMode === "none" && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-[#D4AF37] border-[#D4AF37]/30"
+                  onClick={() => { setAdjustMode("collective"); setAdjustDelta(1); }}
+                >
+                  <Users size={14} />
+                  Ajuster collectif
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-400 border-blue-400/30"
+                  onClick={() => { setAdjustMode("individual"); setAdjustDelta(1); }}
+                >
+                  <Zap size={14} />
+                  Ajuster individuel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-green-400 border-green-400/30 col-span-2"
+                  onClick={() => { setAdjustMode("credit"); setAdjustDelta(1); }}
+                >
+                  <Gift size={14} />
+                  Crédit direct (sans vente)
+                </Button>
+              </div>
+            )}
+
+            {/* Adjust collective/individual balance */}
+            {(adjustMode === "collective" || adjustMode === "individual") && (
               <div className="bg-[#1a1a1a] rounded-xl p-4 space-y-3">
                 <p className="text-sm text-gray-300 font-medium">
-                  Ajustement du solde
+                  Ajustement du solde{" "}
+                  <span className={adjustMode === "individual" ? "text-blue-400" : "text-[#D4AF37]"}>
+                    {adjustMode === "individual" ? "individuel" : "collectif"}
+                  </span>
                 </p>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() =>
-                      setAdjustBalance((a) => ({
-                        ...a,
-                        delta: Math.max(-20, a.delta - 1),
-                      }))
-                    }
+                    onClick={() => setAdjustDelta((d) => Math.max(-20, d - 1))}
                     className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-white hover:bg-[#333] transition-colors"
                   >
                     <MinusCircle size={18} />
                   </button>
                   <div className="flex-1 text-center">
-                    <p
-                      className={`text-2xl font-bold ${
-                        adjustBalance.delta >= 0
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {adjustBalance.delta > 0 ? "+" : ""}
-                      {adjustBalance.delta}
+                    <p className={`text-2xl font-bold ${adjustDelta >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {adjustDelta > 0 ? "+" : ""}
+                      {adjustDelta}
                     </p>
                     <p className="text-xs text-gray-500">
                       Nouveau solde :{" "}
                       {Math.max(
                         0,
-                        selectedMember.session_balance + adjustBalance.delta
+                        (adjustMode === "individual"
+                          ? selectedMember.individual_balance
+                          : selectedMember.collective_balance) + adjustDelta
                       )}
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      setAdjustBalance((a) => ({
-                        ...a,
-                        delta: Math.min(20, a.delta + 1),
-                      }))
-                    }
+                    onClick={() => setAdjustDelta((d) => Math.min(20, d + 1))}
                     className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-white hover:bg-[#333] transition-colors"
                   >
                     <PlusCircle size={18} />
@@ -387,21 +429,77 @@ export default function MembersPage() {
                     variant="ghost"
                     size="sm"
                     className="flex-1"
-                    onClick={() =>
-                      setAdjustBalance({ show: false, delta: 1 })
-                    }
+                    onClick={() => { setAdjustMode("none"); setAdjustDelta(1); }}
                   >
                     Annuler
                   </Button>
                   <Button
                     size="sm"
                     className="flex-1"
-                    onClick={handleAdjustBalance}
+                    onClick={() => handleAdjustBalance(adjustMode as "collective" | "individual")}
                     loading={adjusting}
                   >
                     Confirmer
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Credit direct (no invoice) */}
+            {adjustMode === "credit" && (
+              <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-sm text-gray-300 font-medium mb-0.5">Crédit direct sans vente</p>
+                  <p className="text-xs text-gray-500">Aucune facture générée</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setAdjustDelta((d) => Math.max(1, d - 1))}
+                    className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-white hover:bg-[#333] transition-colors"
+                  >
+                    <MinusCircle size={18} />
+                  </button>
+                  <div className="flex-1 text-center">
+                    <p className="text-2xl font-bold text-green-400">+{adjustDelta}</p>
+                    <p className="text-xs text-gray-500">séance(s) à créditer</p>
+                  </div>
+                  <button
+                    onClick={() => setAdjustDelta((d) => Math.min(50, d + 1))}
+                    className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-white hover:bg-[#333] transition-colors"
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[#D4AF37] border-[#D4AF37]/30"
+                    onClick={() => handleDirectCredit("collective")}
+                    loading={adjusting}
+                  >
+                    <Users size={12} />
+                    Collectif
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-blue-400 border-blue-400/30"
+                    onClick={() => handleDirectCredit("individual")}
+                    loading={adjusting}
+                  >
+                    <Zap size={12} />
+                    Individuel
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => { setAdjustMode("none"); setAdjustDelta(1); }}
+                >
+                  Annuler
+                </Button>
               </div>
             )}
 

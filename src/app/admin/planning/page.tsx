@@ -7,8 +7,8 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { WeeklyCalendar } from "@/components/planning/WeeklyCalendar";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, Palette, Trash2, Clock } from "lucide-react";
-import type { ClassType } from "@/types/database";
+import { Plus, Palette, Trash2 } from "lucide-react";
+import type { ClassType, Profile } from "@/types/database";
 
 const COLOR_PRESETS = [
   "#D4AF37", "#ef4444", "#3b82f6", "#22c55e",
@@ -17,12 +17,15 @@ const COLOR_PRESETS = [
 
 export default function AdminPlanningPage() {
   const [classTypes, setClassTypes] = useState<ClassType[]>([]);
+  const [members, setMembers] = useState<Profile[]>([]);
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [showManageTypes, setShowManageTypes] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [sessionForm, setSessionForm] = useState({
     class_type_id: "",
+    session_type: "collective" as "collective" | "individual",
+    assigned_member_id: "",
     coach_name: "",
     date: "",
     start_hour: "09:00",
@@ -45,12 +48,23 @@ export default function AdminPlanningPage() {
 
   useEffect(() => {
     loadClassTypes();
+    loadMembers();
   }, []);
 
   async function loadClassTypes() {
     const supabase = createClient();
     const { data } = await supabase.from("class_types").select("*").order("name");
     setClassTypes(data || []);
+  }
+
+  async function loadMembers() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "member")
+      .order("last_name");
+    setMembers(data || []);
   }
 
   async function handleCreateSession(e: React.FormEvent) {
@@ -60,6 +74,8 @@ export default function AdminPlanningPage() {
     const supabase = createClient();
     const startTime = new Date(`${sessionForm.date}T${sessionForm.start_hour}:00`);
     const endTime = new Date(`${sessionForm.date}T${sessionForm.end_hour}:00`);
+
+    const isIndividual = sessionForm.session_type === "individual";
 
     const sessions = [];
 
@@ -72,10 +88,12 @@ export default function AdminPlanningPage() {
         end.setDate(end.getDate() + i * 7);
         sessions.push({
           class_type_id: sessionForm.class_type_id,
+          session_type: sessionForm.session_type,
+          assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
           coach_name: sessionForm.coach_name,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
-          max_participants: parseInt(sessionForm.max_participants),
+          max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
           min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
           recurring_rule: `weekly:${weeks}`,
         });
@@ -83,22 +101,49 @@ export default function AdminPlanningPage() {
     } else {
       sessions.push({
         class_type_id: sessionForm.class_type_id,
+        session_type: sessionForm.session_type,
+        assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
         coach_name: sessionForm.coach_name,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        max_participants: parseInt(sessionForm.max_participants),
+        max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
         min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
         recurring_rule: null,
       });
     }
 
-    await supabase.from("class_sessions").insert(sessions);
+    // For individual sessions, also auto-create the booking for the assigned member
+    const { data: createdSessions } = await supabase
+      .from("class_sessions")
+      .insert(sessions)
+      .select("id");
+
+    if (isIndividual && sessionForm.assigned_member_id && createdSessions) {
+      const bookings = createdSessions.map((s) => ({
+        member_id: sessionForm.assigned_member_id,
+        class_session_id: s.id,
+        status: "confirmed" as const,
+        session_debited: true,
+        booked_at: new Date().toISOString(),
+      }));
+
+      await supabase.from("class_bookings").insert(bookings);
+
+      // Debit individual balance for each session
+      for (let i = 0; i < createdSessions.length; i++) {
+        await supabase.rpc("decrement_individual_balance", {
+          p_member_id: sessionForm.assigned_member_id,
+        });
+      }
+    }
 
     setSavingSession(false);
     setShowCreateSession(false);
     setRefreshKey((k) => k + 1);
     setSessionForm({
       class_type_id: "",
+      session_type: "collective",
+      assigned_member_id: "",
       coach_name: "",
       date: "",
       start_hour: "09:00",
@@ -133,13 +178,15 @@ export default function AdminPlanningPage() {
     loadClassTypes();
   }
 
+  const isIndividual = sessionForm.session_type === "individual";
+
   return (
     <div className="p-4 lg:p-8 space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Planning</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Gérez les cours collectifs
+            Gérez les cours collectifs et individuels
           </p>
         </div>
         <div className="flex gap-2">
@@ -164,6 +211,54 @@ export default function AdminPlanningPage() {
         size="lg"
       >
         <form onSubmit={handleCreateSession} className="space-y-4">
+          {/* Session type */}
+          <div>
+            <p className="text-sm font-medium text-gray-300 mb-2">Type de séance</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "collective" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  !isIndividual
+                    ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Cours collectif
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  isIndividual
+                    ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Cours individuel
+              </button>
+            </div>
+          </div>
+
+          {/* Member selection for individual sessions */}
+          {isIndividual && (
+            <Select
+              label="Adhérent concerné"
+              value={sessionForm.assigned_member_id}
+              onChange={(e) =>
+                setSessionForm({ ...sessionForm, assigned_member_id: e.target.value })
+              }
+              options={[
+                { value: "", label: "Sélectionner un adhérent..." },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: `${m.first_name} ${m.last_name}`,
+                })),
+              ]}
+              required={isIndividual}
+            />
+          )}
+
           <Select
             label="Type de cours"
             value={sessionForm.class_type_id}
@@ -214,17 +309,32 @@ export default function AdminPlanningPage() {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Places max"
-              type="number"
-              min="1"
-              value={sessionForm.max_participants}
-              onChange={(e) =>
-                setSessionForm({ ...sessionForm, max_participants: e.target.value })
-              }
-              required
-            />
+
+          {!isIndividual && (
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Places max"
+                type="number"
+                min="1"
+                value={sessionForm.max_participants}
+                onChange={(e) =>
+                  setSessionForm({ ...sessionForm, max_participants: e.target.value })
+                }
+                required
+              />
+              <Input
+                label="Annulation min (heures)"
+                type="number"
+                min="0"
+                value={sessionForm.min_cancel_hours}
+                onChange={(e) =>
+                  setSessionForm({ ...sessionForm, min_cancel_hours: e.target.value })
+                }
+              />
+            </div>
+          )}
+
+          {isIndividual && (
             <Input
               label="Annulation min (heures)"
               type="number"
@@ -234,7 +344,7 @@ export default function AdminPlanningPage() {
                 setSessionForm({ ...sessionForm, min_cancel_hours: e.target.value })
               }
             />
-          </div>
+          )}
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -263,8 +373,22 @@ export default function AdminPlanningPage() {
             />
           )}
 
+          {isIndividual && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+              <p className="text-xs text-blue-400">
+                ✓ L&apos;adhérent sera automatiquement inscrit et son solde individuel débité
+                {sessionForm.recurring ? ` pour ${sessionForm.weeks} séances` : ""}.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowCreateSession(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              onClick={() => setShowCreateSession(false)}
+            >
               Annuler
             </Button>
             <Button type="submit" loading={savingSession} className="flex-1">
@@ -284,7 +408,6 @@ export default function AdminPlanningPage() {
         size="lg"
       >
         <div className="space-y-4">
-          {/* Existing types */}
           {classTypes.length > 0 && (
             <div className="space-y-2">
               {classTypes.map((type) => (
@@ -298,9 +421,7 @@ export default function AdminPlanningPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium">{type.name}</p>
-                    <p className="text-gray-500 text-xs">
-                      {type.duration_minutes} min
-                    </p>
+                    <p className="text-gray-500 text-xs">{type.duration_minutes} min</p>
                   </div>
                   <button
                     onClick={() => deleteClassType(type.id)}
@@ -313,19 +434,14 @@ export default function AdminPlanningPage() {
             </div>
           )}
 
-          {/* Add new type */}
           <div className="border-t border-[#1f1f1f] pt-4">
-            <p className="text-sm font-medium text-gray-300 mb-3">
-              Ajouter un type
-            </p>
+            <p className="text-sm font-medium text-gray-300 mb-3">Ajouter un type</p>
             <form onSubmit={handleCreateType} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   label="Nom"
                   value={typeForm.name}
-                  onChange={(e) =>
-                    setTypeForm({ ...typeForm, name: e.target.value })
-                  }
+                  onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
                   placeholder="Ex: Yoga, Pilates..."
                   required
                 />

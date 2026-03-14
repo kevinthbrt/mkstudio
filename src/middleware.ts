@@ -5,8 +5,13 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are missing, allow all requests (fail open rather than crash)
+  // If env vars are missing, fail closed — redirect to login for all protected routes
   if (!supabaseUrl || !supabaseAnonKey) {
+    const pathname = request.nextUrl.pathname;
+    const publicRoutes = ["/login", "/register", "/"];
+    if (!publicRoutes.includes(pathname)) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
     return NextResponse.next({ request });
   }
 

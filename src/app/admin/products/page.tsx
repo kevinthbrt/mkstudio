@@ -7,7 +7,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
-import { Plus, Package, Edit, Trash2, Zap } from "lucide-react";
+import { Plus, Package, Edit, Trash2, Zap, Users } from "lucide-react";
 import { formatPriceFromEuros } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -24,6 +24,7 @@ export default function ProductsPage() {
     description: "",
     price: "",
     session_count: "",
+    session_type: "collective" as "collective" | "individual",
     active: true,
   });
 
@@ -43,7 +44,7 @@ export default function ProductsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: "", description: "", price: "", session_count: "", active: true });
+    setForm({ name: "", description: "", price: "", session_count: "", session_type: "collective", active: true });
     setShowModal(true);
   }
 
@@ -54,6 +55,7 @@ export default function ProductsPage() {
       description: product.description || "",
       price: String(product.price),
       session_count: String(product.session_count),
+      session_type: product.session_type || "collective",
       active: product.active,
     });
     setShowModal(true);
@@ -69,6 +71,7 @@ export default function ProductsPage() {
       description: form.description || null,
       price: parseFloat(form.price),
       session_count: parseInt(form.session_count),
+      session_type: form.session_type,
       active: form.active,
     };
 
@@ -127,12 +130,24 @@ export default function ProductsPage() {
           {products.map((product) => (
             <Card key={product.id} className="p-5">
               <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center">
-                  <Zap size={18} className="text-[#D4AF37]" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  product.session_type === "individual"
+                    ? "bg-blue-500/10 border border-blue-500/20"
+                    : "bg-[#D4AF37]/10 border border-[#D4AF37]/20"
+                }`}>
+                  {product.session_type === "individual"
+                    ? <Zap size={18} className="text-blue-400" />
+                    : <Users size={18} className="text-[#D4AF37]" />
+                  }
                 </div>
-                <Badge variant={product.active ? "green" : "red"}>
-                  {product.active ? "Actif" : "Inactif"}
-                </Badge>
+                <div className="flex gap-1.5">
+                  <Badge variant={product.session_type === "individual" ? "blue" : "gray"}>
+                    {product.session_type === "individual" ? "Individuel" : "Collectif"}
+                  </Badge>
+                  <Badge variant={product.active ? "green" : "red"}>
+                    {product.active ? "Actif" : "Inactif"}
+                  </Badge>
+                </div>
               </div>
 
               <h3 className="text-white font-semibold">{product.name}</h3>
@@ -226,6 +241,34 @@ export default function ProductsPage() {
             />
           </div>
 
+          <div>
+            <p className="text-sm font-medium text-gray-300 mb-2">Type de séances</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, session_type: "collective" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  form.session_type === "collective"
+                    ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Collectif
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, session_type: "individual" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  form.session_type === "individual"
+                    ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Individuel
+              </button>
+            </div>
+          </div>
+
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -234,7 +277,7 @@ export default function ProductsPage() {
               className="w-4 h-4 accent-[#D4AF37]"
             />
             <span className="text-sm text-gray-300">
-              Produit actif (visible dans la boutique)
+              Produit actif
             </span>
           </label>
 

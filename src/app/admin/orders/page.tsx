@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
-import { CreditCard, Plus, Download, FileText } from "lucide-react";
+import { CreditCard, Plus, Download, FileText, Users, Zap } from "lucide-react";
 import { formatDate, formatPriceFromEuros } from "@/lib/utils";
 import type { Product, Profile } from "@/types/database";
 
@@ -18,7 +18,7 @@ interface OrderWithDetails {
   status: string;
   created_at: string;
   profiles: { first_name: string; last_name: string };
-  products: { name: string };
+  products: { name: string; session_type: string };
 }
 
 export default function OrdersPage() {
@@ -41,13 +41,13 @@ export default function OrdersPage() {
     const [ordersRes, membersRes, productsRes] = await Promise.all([
       supabase
         .from("orders")
-        .select(`*, profiles (first_name, last_name), products (name)`)
+        .select(`*, profiles (first_name, last_name), products (name, session_type)`)
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").eq("role", "member").order("last_name"),
-      supabase.from("products").select("*").eq("active", true),
+      supabase.from("products").select("*").eq("active", true).order("name"),
     ]);
 
-    setOrders((ordersRes.data as any[]) || []);
+    setOrders((ordersRes.data as OrderWithDetails[]) || []);
     setMembers(membersRes.data || []);
     setProducts(productsRes.data || []);
     setLoading(false);
@@ -99,6 +99,11 @@ export default function OrdersPage() {
 
   const totalRevenue = orders.reduce((sum, o) => sum + o.amount, 0);
 
+  const collectiveProducts = products.filter((p) => p.session_type === "collective" || !p.session_type);
+  const individualProducts = products.filter((p) => p.session_type === "individual");
+
+  const selectedProduct = products.find((p) => p.id === form.product_id);
+
   if (loading) {
     return (
       <div className="p-4 lg:p-8 flex items-center justify-center min-h-64">
@@ -132,43 +137,54 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4 flex items-center gap-4"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#D4AF37] flex-shrink-0">
-                <FileText size={18} />
+          {orders.map((order) => {
+            const isIndividual = order.products?.session_type === "individual";
+            return (
+              <div
+                key={order.id}
+                className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4 flex items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#D4AF37] flex-shrink-0">
+                  <FileText size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium text-sm">
+                    {order.profiles?.first_name} {order.profiles?.last_name}
+                  </p>
+                  <p className="text-gray-500 text-xs mt-0.5">
+                    {order.products?.name} — {order.sessions_purchased} séance(s)
+                    {isIndividual ? " individuelles" : " collectives"}
+                  </p>
+                  <p className="text-gray-600 text-xs mt-0.5">
+                    {order.invoice_number} — {formatDate(order.created_at)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                  <p className="text-[#D4AF37] font-bold">
+                    {formatPriceFromEuros(order.amount)}
+                  </p>
+                  <div className="flex gap-1">
+                    <Badge variant="green">Payé</Badge>
+                    {isIndividual ? (
+                      <Badge variant="blue">Individuel</Badge>
+                    ) : (
+                      <Badge variant="gray">Collectif</Badge>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => downloadInvoice(order.id)}
+                    loading={generatingId === order.id}
+                    className="text-xs"
+                  >
+                    <Download size={12} />
+                    Facture
+                  </Button>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium text-sm">
-                  {order.profiles?.first_name} {order.profiles?.last_name}
-                </p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  {order.products?.name} — {order.sessions_purchased} séance(s)
-                </p>
-                <p className="text-gray-600 text-xs mt-0.5">
-                  {order.invoice_number} — {formatDate(order.created_at)}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <p className="text-[#D4AF37] font-bold">
-                  {formatPriceFromEuros(order.amount)}
-                </p>
-                <Badge variant="green">Payé</Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => downloadInvoice(order.id)}
-                  loading={generatingId === order.id}
-                  className="text-xs"
-                >
-                  <Download size={12} />
-                  Facture
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -195,34 +211,98 @@ export default function OrdersPage() {
             ]}
             required
           />
-          <Select
-            label="Produit"
-            value={form.product_id}
-            onChange={(e) => setForm({ ...form, product_id: e.target.value })}
-            options={[
-              { value: "", label: "Sélectionner un produit..." },
-              ...products.map((p) => ({
-                value: p.id,
-                label: `${p.name} — ${formatPriceFromEuros(p.price)} (${p.session_count} séances)`,
-              })),
-            ]}
-            required
-          />
 
-          {form.product_id && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-300">Produit</p>
+
+            {collectiveProducts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Users size={11} /> Packs collectifs
+                </p>
+                {collectiveProducts.map((p) => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      form.product_id === p.id
+                        ? "bg-[#D4AF37]/10 border-[#D4AF37]/40"
+                        : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="product_id"
+                        value={p.id}
+                        checked={form.product_id === p.id}
+                        onChange={() => setForm({ ...form, product_id: p.id })}
+                        className="accent-[#D4AF37]"
+                      />
+                      <div>
+                        <p className="text-white text-sm font-medium">{p.name}</p>
+                        <p className="text-gray-500 text-xs">{p.session_count} séances</p>
+                      </div>
+                    </div>
+                    <p className="text-[#D4AF37] font-bold text-sm">
+                      {formatPriceFromEuros(p.price)}
+                    </p>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {individualProducts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Zap size={11} /> Packs individuels
+                </p>
+                {individualProducts.map((p) => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      form.product_id === p.id
+                        ? "bg-blue-500/10 border-blue-500/40"
+                        : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="product_id"
+                        value={p.id}
+                        checked={form.product_id === p.id}
+                        onChange={() => setForm({ ...form, product_id: p.id })}
+                        className="accent-blue-400"
+                      />
+                      <div>
+                        <p className="text-white text-sm font-medium">{p.name}</p>
+                        <p className="text-gray-500 text-xs">{p.session_count} séances</p>
+                      </div>
+                    </div>
+                    <p className="text-blue-400 font-bold text-sm">
+                      {formatPriceFromEuros(p.price)}
+                    </p>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedProduct && (
             <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]">
-              {(() => {
-                const product = products.find((p) => p.id === form.product_id);
-                if (!product) return null;
-                return (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-sm">Montant à encaisser</span>
-                    <span className="text-[#D4AF37] font-bold text-lg">
-                      {formatPriceFromEuros(product.price)}
-                    </span>
-                  </div>
-                );
-              })()}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Montant à encaisser</span>
+                <span className="text-[#D4AF37] font-bold text-lg">
+                  {formatPriceFromEuros(selectedProduct.price)}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Crédite le solde{" "}
+                <span className={selectedProduct.session_type === "individual" ? "text-blue-400" : "text-[#D4AF37]"}>
+                  {selectedProduct.session_type === "individual" ? "individuel" : "collectif"}
+                </span>{" "}
+                de l&apos;adhérent
+              </p>
             </div>
           )}
 
@@ -249,7 +329,7 @@ export default function OrdersPage() {
             >
               Annuler
             </Button>
-            <Button type="submit" loading={selling} className="flex-1">
+            <Button type="submit" loading={selling} className="flex-1" disabled={!form.member_id || !form.product_id}>
               Valider la vente
             </Button>
           </div>

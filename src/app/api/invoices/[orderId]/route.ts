@@ -1,6 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function generateInvoiceHTML(
   order: any,
   member: any,
@@ -212,12 +222,12 @@ function generateInvoiceHTML(
     <!-- Header -->
     <div class="header">
       <div class="logo-section">
-        <h1>${settings.business_name}</h1>
+        <h1>${escapeHtml(settings.business_name)}</h1>
         <div class="subtitle">Coach Sportif</div>
       </div>
       <div class="invoice-meta">
         <div class="invoice-title">FACTURE</div>
-        <div class="invoice-number">${order.invoice_number}</div>
+        <div class="invoice-number">${escapeHtml(order.invoice_number)}</div>
         <div class="invoice-date">Émise le ${formattedDate}</div>
       </div>
     </div>
@@ -226,21 +236,21 @@ function generateInvoiceHTML(
     <div class="parties">
       <div class="party-block">
         <h3>Prestataire</h3>
-        <p class="name">${settings.owner_name}</p>
-        <p>${settings.business_name}</p>
-        <p>${settings.address}</p>
-        <p>${settings.postal_code} ${settings.city}</p>
-        <p>${settings.country}</p>
-        <p>Email : ${settings.email}</p>
-        <p>Tél : ${settings.phone}</p>
-        <p style="margin-top:8px;">SIRET : ${settings.siret}</p>
-        ${settings.ape_code ? `<p>APE : ${settings.ape_code}</p>` : ""}
+        <p class="name">${escapeHtml(settings.owner_name)}</p>
+        <p>${escapeHtml(settings.business_name)}</p>
+        <p>${escapeHtml(settings.address)}</p>
+        <p>${escapeHtml(settings.postal_code)} ${escapeHtml(settings.city)}</p>
+        <p>${escapeHtml(settings.country)}</p>
+        <p>Email : ${escapeHtml(settings.email)}</p>
+        <p>Tél : ${escapeHtml(settings.phone)}</p>
+        <p style="margin-top:8px;">SIRET : ${escapeHtml(settings.siret)}</p>
+        ${settings.ape_code ? `<p>APE : ${escapeHtml(settings.ape_code)}</p>` : ""}
       </div>
       <div class="party-block">
         <h3>Client</h3>
-        <p class="name">${member.first_name} ${member.last_name}</p>
-        <p>Email : ${member.email}</p>
-        ${member.phone ? `<p>Tél : ${member.phone}</p>` : ""}
+        <p class="name">${escapeHtml(member.first_name)} ${escapeHtml(member.last_name)}</p>
+        <p>Email : ${escapeHtml(member.email)}</p>
+        ${member.phone ? `<p>Tél : ${escapeHtml(member.phone)}</p>` : ""}
       </div>
     </div>
 
@@ -258,12 +268,12 @@ function generateInvoiceHTML(
         <tbody>
           <tr>
             <td>
-              <strong>${product.name}</strong>
-              ${product.description ? `<br><span style="color:#666;font-size:12px;">${product.description}</span>` : ""}
+              <strong>${escapeHtml(product.name)}</strong>
+              ${product.description ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(product.description)}</span>` : ""}
             </td>
-            <td>${order.sessions_purchased} séance(s)</td>
+            <td>${Number(order.sessions_purchased)} séance(s)</td>
             <td>${(order.amount / order.sessions_purchased).toFixed(2)} €</td>
-            <td>${order.amount.toFixed(2)} €</td>
+            <td>${Number(order.amount).toFixed(2)} €</td>
           </tr>
         </tbody>
       </table>
@@ -273,7 +283,7 @@ function generateInvoiceHTML(
     <div class="totals">
       <div class="total-row">
         <span>Total HT</span>
-        <span>${order.amount.toFixed(2)} €</span>
+        <span>${Number(order.amount).toFixed(2)} €</span>
       </div>
       <div class="total-row">
         <span>TVA</span>
@@ -281,25 +291,25 @@ function generateInvoiceHTML(
       </div>
       <div class="total-row final">
         <span>TOTAL TTC</span>
-        <span>${order.amount.toFixed(2)} €</span>
+        <span>${Number(order.amount).toFixed(2)} €</span>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="footer">
       <div class="tva-mention">
-        ⚡ ${settings.tva_mention}
+        ⚡ ${escapeHtml(settings.tva_mention)}
       </div>
 
       ${settings.bank_details ? `
       <div style="margin-bottom:16px; font-size:12px; color:#555;">
         <strong>Coordonnées bancaires :</strong><br>
-        ${settings.bank_details}
+        ${escapeHtml(settings.bank_details)}
       </div>
       ` : ""}
 
       <div class="legal-text">
-        <strong>Conditions de paiement :</strong> ${settings.payment_terms}<br>
+        <strong>Conditions de paiement :</strong> ${escapeHtml(settings.payment_terms)}<br>
         Date de réalisation de la prestation : ${formattedDate}<br>
       </div>
       <div class="penalty-text">

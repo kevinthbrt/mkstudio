@@ -12,6 +12,7 @@ import {
   User,
   Users,
 } from "lucide-react";
+// Package and CreditCard kept for admin nav
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -26,8 +27,6 @@ const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Tableau de bord", icon: <Home size={18} /> },
   { href: "/dashboard/planning", label: "Planning", icon: <Calendar size={18} /> },
   { href: "/dashboard/sessions", label: "Mes séances", icon: <BarChart3 size={18} /> },
-  { href: "/dashboard/shop", label: "Boutique", icon: <Package size={18} /> },
-  { href: "/dashboard/purchases", label: "Achats & Factures", icon: <CreditCard size={18} /> },
   { href: "/dashboard/profile", label: "Mon profil", icon: <User size={18} /> },
 ];
 
