@@ -2,11 +2,15 @@ import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import * as path from "path";
 
-const supabaseUrl = "https://fjzzylksthpnunrqazdg.supabase.co";
-const serviceRoleKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqenp5bGtzdGhwbnVucnFhemRnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQyMTIwNSwiZXhwIjoyMDg4OTk3MjA1fQ.xBC1fLV9LaQrC3kbPSCBxDdsWathDO4ReVOCXmR4xp4";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error("Missing env vars: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.");
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl!, serviceRoleKey!, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
