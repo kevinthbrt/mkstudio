@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui/Card";
-import { Zap, Calendar, ShoppingBag, TrendingUp } from "lucide-react";
+import { Zap, Calendar, Users, TrendingUp, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { formatDateTime, formatPriceFromEuros } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 
 export default async function MemberDashboard() {
@@ -22,7 +22,6 @@ export default async function MemberDashboard() {
 
   if (!profile) redirect("/login");
 
-  // Upcoming bookings
   const { data: upcomingBookings } = await supabase
     .from("class_bookings")
     .select(`
@@ -36,17 +35,8 @@ export default async function MemberDashboard() {
     .eq("status", "confirmed")
     .gte("class_sessions.start_time", new Date().toISOString())
     .order("class_sessions(start_time)", { ascending: true })
-    .limit(3);
+    .limit(5);
 
-  // Recent orders
-  const { data: recentOrders } = await supabase
-    .from("orders")
-    .select(`*, products (name)`)
-    .eq("member_id", profile.id)
-    .order("created_at", { ascending: false })
-    .limit(3);
-
-  // Total sessions booked
   const { count: totalBookings } = await supabase
     .from("class_bookings")
     .select("*", { count: "exact", head: true })
@@ -55,73 +45,81 @@ export default async function MemberDashboard() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
-      {/* Welcome */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">
-          Bonjour, {profile.first_name} 👋
+      {/* Welcome banner */}
+      <div className="relative overflow-hidden rounded-3xl p-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.03) 60%, transparent 100%)",
+          border: "1px solid rgba(212,175,55,0.15)",
+        }}
+      >
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(212,175,55,0.1) 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
+        />
+        <p className="text-xs font-semibold text-[#D4AF37]/70 uppercase tracking-widest mb-1">Bienvenue</p>
+        <h1 className="text-2xl font-black text-white tracking-tight">
+          {profile.first_name} 👋
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Bienvenue dans votre espace personnel MK Studio
+          Votre espace personnel MK Studio
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard
-          title="Solde de séances"
-          value={profile.session_balance}
-          subtitle="séances disponibles"
+          title="Séances collectives"
+          value={profile.collective_balance}
+          subtitle="disponibles"
+          icon={<Users size={18} />}
+          color="gold"
+        />
+        <StatCard
+          title="Séances individuelles"
+          value={profile.individual_balance}
+          subtitle="disponibles"
           icon={<Zap size={18} />}
+          color="blue"
         />
         <StatCard
           title="Cours à venir"
           value={upcomingBookings?.length || 0}
           subtitle="prochains cours"
           icon={<Calendar size={18} />}
+          color="green"
         />
         <StatCard
           title="Total réservations"
           value={totalBookings || 0}
           subtitle="depuis l'inscription"
           icon={<TrendingUp size={18} />}
-        />
-        <StatCard
-          title="Commandes"
-          value={recentOrders?.length || 0}
-          subtitle="achats effectués"
-          icon={<ShoppingBag size={18} />}
+          color="purple"
         />
       </div>
 
-      {/* Session balance highlight */}
-      {profile.session_balance === 0 && (
-        <div className="bg-gradient-to-r from-[#D4AF37]/10 to-[#B8941E]/10 border border-[#D4AF37]/20 rounded-xl p-4 flex items-center justify-between">
+      {/* Low balance warning */}
+      {profile.collective_balance === 0 && profile.individual_balance === 0 && (
+        <div className="rounded-2xl p-4 flex items-start gap-3"
+          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
+        >
+          <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
           <div>
-            <p className="text-[#D4AF37] font-semibold text-sm">
-              Votre solde est vide
-            </p>
-            <p className="text-gray-400 text-xs mt-0.5">
-              Achetez un pack pour réserver des cours
+            <p className="text-amber-400 font-semibold text-sm">Vos soldes sont épuisés</p>
+            <p className="text-gray-500 text-xs mt-0.5">
+              Contactez votre coach pour acheter un pack de séances.
             </p>
           </div>
-          <Link
-            href="/dashboard/shop"
-            className="bg-gradient-to-r from-[#D4AF37] via-[#F5E06B] to-[#D4AF37] text-black font-semibold text-sm px-4 py-2 rounded-lg hover:shadow-[0_4px_20px_rgba(212,175,55,0.4)] transition-all"
-          >
-            Acheter
-          </Link>
         </div>
       )}
 
       {/* Upcoming classes */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-white">Mes prochains cours</h2>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Mes prochains cours</h2>
           <Link
             href="/dashboard/sessions"
-            className="text-[#D4AF37] text-xs font-medium hover:underline"
+            className="text-[#D4AF37] text-xs font-semibold hover:text-[#F5E06B] flex items-center gap-1 transition-colors"
           >
-            Voir tout
+            Voir tout <ArrowRight size={12} />
           </Link>
         </div>
 
@@ -130,87 +128,59 @@ export default async function MemberDashboard() {
             {upcomingBookings.map((booking) => {
               const session = booking.class_sessions as any;
               if (!session) return null;
+              const isIndividual = session.session_type === "individual";
               return (
                 <div
                   key={booking.id}
-                  className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4 flex items-center gap-4"
+                  className="rounded-2xl p-4 flex items-center gap-4 transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(30,28,45,0.8) 0%, rgba(22,21,38,0.9) 100%)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                  }}
                 >
                   <div
-                    className="w-2 h-12 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: session.class_types?.color || "#D4AF37",
-                    }}
+                    className="w-1.5 h-12 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: session.class_types?.color || "#D4AF37" }}
                   />
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: (session.class_types?.color || "#D4AF37") + "20" }}
+                  >
+                    <Calendar size={16} style={{ color: session.class_types?.color || "#D4AF37" }} />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium text-sm">
+                    <p className="text-white font-semibold text-sm">
                       {session.class_types?.name}
                     </p>
                     <p className="text-gray-500 text-xs mt-0.5">
-                      {formatDateTime(session.start_time)} — {session.coach_name}
+                      {formatDateTime(session.start_time)} · {session.coach_name}
                     </p>
                   </div>
-                  <Badge variant="green">Confirmé</Badge>
+                  <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                    <Badge variant="green">Confirmé</Badge>
+                    {isIndividual && <Badge variant="blue">Individuel</Badge>}
+                  </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-6 text-center">
-            <Calendar size={24} className="text-gray-600 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">Aucun cours à venir</p>
-            <Link
-              href="/dashboard/planning"
-              className="text-[#D4AF37] text-xs font-medium hover:underline mt-1 inline-block"
+          <Link href="/dashboard/planning">
+            <div className="rounded-2xl p-8 text-center transition-all hover:border-[#D4AF37]/20 cursor-pointer"
+              style={{
+                background: "linear-gradient(135deg, rgba(30,28,45,0.5) 0%, rgba(22,21,38,0.6) 100%)",
+                border: "1px dashed rgba(255,255,255,0.06)",
+              }}
             >
-              Voir le planning →
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Recent purchases */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-white">Achats récents</h2>
-          <Link
-            href="/dashboard/purchases"
-            className="text-[#D4AF37] text-xs font-medium hover:underline"
-          >
-            Voir tout
-          </Link>
-        </div>
-
-        {recentOrders && recentOrders.length > 0 ? (
-          <div className="space-y-2">
-            {recentOrders.map((order) => (
-              <div
-                key={order.id}
-                className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    {(order.products as any)?.name}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-0.5">
-                    {order.sessions_purchased} séance(s) — {order.invoice_number}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[#D4AF37] font-semibold text-sm">
-                    {formatPriceFromEuros(order.amount)}
-                  </p>
-                  <Badge variant="green" className="mt-1">
-                    Payé
-                  </Badge>
-                </div>
+              <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-3">
+                <Calendar size={20} className="text-[#D4AF37]" />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-6 text-center">
-            <ShoppingBag size={24} className="text-gray-600 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">Aucun achat effectué</p>
-          </div>
+              <p className="text-gray-400 text-sm font-medium">Aucun cours à venir</p>
+              <p className="text-[#D4AF37] text-xs font-semibold mt-1">
+                Consulter le planning →
+              </p>
+            </div>
+          </Link>
         )}
       </div>
     </div>

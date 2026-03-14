@@ -1,7 +1,6 @@
 -- ============================================
 -- FIX: RLS infinite recursion on profiles table
--- Coller dans SQL Editor Supabase
--- https://supabase.com/dashboard/project/fjzzylksthpnunrqazdg/sql/new
+-- Apply in Supabase SQL Editor
 -- ============================================
 
 -- 1. Create a SECURITY DEFINER function to check admin status

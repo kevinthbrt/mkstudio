@@ -13,6 +13,7 @@ import {
   User,
   Zap,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import {
   getWeekDays,
@@ -21,8 +22,9 @@ import {
   formatDate,
 } from "@/lib/utils";
 
-interface ClassSessionWithType {
+export interface ClassSessionWithType {
   id: string;
+  class_type_id: string;
   start_time: string;
   end_time: string;
   coach_name: string;
@@ -30,6 +32,9 @@ interface ClassSessionWithType {
   current_participants: number;
   min_cancel_hours: number;
   is_cancelled: boolean;
+  session_type: "collective" | "individual";
+  assigned_member_id: string | null;
+  assigned_member_name?: string | null;
   class_types: {
     name: string;
     color: string;
@@ -39,9 +44,10 @@ interface ClassSessionWithType {
 
 interface CalendarProps {
   memberId?: string;
-  sessionBalance?: number;
+  collectiveBalance?: number;
+  individualBalance?: number;
   isAdmin?: boolean;
-  onSessionCreated?: () => void;
+  onRequestEdit?: (session: ClassSessionWithType) => void;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -49,15 +55,16 @@ const DAYS_FULL_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi
 
 export function WeeklyCalendar({
   memberId,
-  sessionBalance = 0,
+  collectiveBalance = 0,
+  individualBalance = 0,
   isAdmin = false,
+  onRequestEdit,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
   const [bookings, setBookings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] =
-    useState<ClassSessionWithType | null>(null);
+  const [selectedSession, setSelectedSession] = useState<ClassSessionWithType | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
 
@@ -65,6 +72,7 @@ export function WeeklyCalendar({
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeek]);
 
   async function loadData() {
@@ -81,7 +89,43 @@ export function WeeklyCalendar({
       .eq("is_cancelled", false)
       .order("start_time");
 
-    setSessions((sessionsData as any[]) || []);
+    const rawSessions = (sessionsData as unknown as ClassSessionWithType[]) || [];
+
+    // For admin: fetch names for individual sessions' assigned members
+    if (isAdmin) {
+      const memberIds = [
+        ...new Set(
+          rawSessions
+            .filter((s) => s.session_type === "individual" && s.assigned_member_id)
+            .map((s) => s.assigned_member_id as string)
+        ),
+      ];
+
+      if (memberIds.length > 0) {
+        const { data: membersData } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", memberIds);
+
+        const memberMap: Record<string, string> = {};
+        (membersData || []).forEach((m: any) => {
+          memberMap[m.id] = `${m.first_name} ${m.last_name}`;
+        });
+
+        setSessions(
+          rawSessions.map((s) => ({
+            ...s,
+            assigned_member_name: s.assigned_member_id
+              ? memberMap[s.assigned_member_id] ?? null
+              : null,
+          }))
+        );
+      } else {
+        setSessions(rawSessions);
+      }
+    } else {
+      setSessions(rawSessions);
+    }
 
     if (memberId) {
       const { data: bookingsData } = await supabase
@@ -101,18 +145,18 @@ export function WeeklyCalendar({
 
   async function handleBook(session: ClassSessionWithType) {
     if (!memberId) return;
+    if (!isAdmin && session.session_type === "individual") return;
+
     setBooking(true);
     setBookingError("");
 
     const isBooked = bookings[session.id] === "confirmed";
 
     if (isBooked) {
-      // Cancel booking
       const supabase = createClient();
       const sessionStart = new Date(session.start_time);
       const now = new Date();
-      const hoursLeft =
-        (sessionStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const hoursLeft = (sessionStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
       if (hoursLeft < session.min_cancel_hours) {
         setBookingError(
@@ -133,42 +177,36 @@ export function WeeklyCalendar({
       if (existingBooking) {
         await supabase
           .from("class_bookings")
-          .update({
-            status: "cancelled",
-            cancelled_at: new Date().toISOString(),
-          })
+          .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
           .eq("id", existingBooking.id);
 
         if (existingBooking.session_debited) {
-          await supabase.rpc("increment_session_balance", {
-            p_member_id: memberId,
-          });
+          if (session.session_type === "individual") {
+            await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
+          } else {
+            await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
+          }
         }
 
-        await supabase.rpc("decrement_participants", {
-          session_id: session.id,
-        });
+        await supabase.rpc("decrement_participants", { session_id: session.id });
       }
 
       setBookings((b) => ({ ...b, [session.id]: "cancelled" }));
       setSessions((s) =>
         s.map((sess) =>
           sess.id === session.id
-            ? {
-                ...sess,
-                current_participants: Math.max(
-                  0,
-                  sess.current_participants - 1
-                ),
-              }
+            ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) }
             : sess
         )
       );
     } else {
-      // Book session
-      if (sessionBalance <= 0) {
+      const balance = session.session_type === "individual" ? individualBalance : collectiveBalance;
+
+      if (balance <= 0 && !isAdmin) {
         setBookingError(
-          "Solde insuffisant. Achetez un pack de séances pour vous inscrire."
+          session.session_type === "individual"
+            ? "Solde individuel insuffisant."
+            : "Solde collectif insuffisant. Contactez votre coach pour acheter un pack."
         );
         setBooking(false);
         return;
@@ -182,14 +220,17 @@ export function WeeklyCalendar({
 
       const supabase = createClient();
 
-      const { error } = await supabase.from("class_bookings").upsert({
-        member_id: memberId,
-        class_session_id: session.id,
-        status: "confirmed",
-        session_debited: true,
-        booked_at: new Date().toISOString(),
-        cancelled_at: null,
-      }, { onConflict: "member_id,class_session_id" });
+      const { error } = await supabase.from("class_bookings").upsert(
+        {
+          member_id: memberId,
+          class_session_id: session.id,
+          status: "confirmed",
+          session_debited: true,
+          booked_at: new Date().toISOString(),
+          cancelled_at: null,
+        },
+        { onConflict: "member_id,class_session_id" }
+      );
 
       if (error) {
         setBookingError("Une erreur est survenue. Réessayez.");
@@ -197,13 +238,13 @@ export function WeeklyCalendar({
         return;
       }
 
-      await supabase.rpc("decrement_session_balance", {
-        p_member_id: memberId,
-      });
+      if (session.session_type === "individual") {
+        await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
+      } else {
+        await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
+      }
 
-      await supabase.rpc("increment_participants", {
-        session_id: session.id,
-      });
+      await supabase.rpc("increment_participants", { session_id: session.id });
 
       setBookings((b) => ({ ...b, [session.id]: "confirmed" }));
       setSessions((s) =>
@@ -231,6 +272,25 @@ export function WeeklyCalendar({
   };
 
   const today = new Date();
+
+  function getSessionBadge(session: ClassSessionWithType) {
+    const isBooked = bookings[session.id] === "confirmed";
+    const isFull = session.current_participants >= session.max_participants;
+    const isIndividual = session.session_type === "individual";
+
+    if (isBooked) return <Badge variant="green">Inscrit</Badge>;
+    if (isIndividual) return <Badge variant="blue">Individuel</Badge>;
+    if (isFull) return <Badge variant="red">Complet</Badge>;
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -260,14 +320,10 @@ export function WeeklyCalendar({
 
           return (
             <div key={dayIdx}>
-              <div
-                className={`flex items-center gap-2 mb-2 pb-2 border-b border-[#1f1f1f]`}
-              >
+              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#1f1f1f]">
                 <div
                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                    isToday
-                      ? "bg-[#D4AF37] text-black"
-                      : "bg-[#1a1a1a] text-gray-400"
+                    isToday ? "bg-[#D4AF37] text-black" : "bg-[#1a1a1a] text-gray-400"
                   }`}
                 >
                   {day.getDate()}
@@ -276,21 +332,25 @@ export function WeeklyCalendar({
                   {DAYS_FULL_FR[dayIdx]}
                 </span>
                 {daySessions.length === 0 && (
-                  <span className="text-xs text-gray-600 ml-auto">
-                    Pas de cours
-                  </span>
+                  <span className="text-xs text-gray-600 ml-auto">Pas de cours</span>
                 )}
               </div>
 
               {daySessions.map((session) => {
                 const isBooked = bookings[session.id] === "confirmed";
-                const isFull =
-                  session.current_participants >= session.max_participants;
+                const isFull = session.current_participants >= session.max_participants;
+                const isIndividual = session.session_type === "individual";
 
                 return (
                   <div
                     key={session.id}
-                    className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3 mb-2 cursor-pointer hover:border-[#D4AF37]/30 transition-colors"
+                    className={`border rounded-xl p-3 mb-2 cursor-pointer transition-colors ${
+                      isBooked
+                        ? "bg-[#D4AF37]/10 border-[#D4AF37]/30"
+                        : isIndividual
+                        ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
+                        : "bg-[#111111] border-[#1f1f1f] hover:border-[#D4AF37]/30"
+                    }`}
                     onClick={() => {
                       setSelectedSession(session);
                       setBookingError("");
@@ -298,7 +358,7 @@ export function WeeklyCalendar({
                   >
                     <div className="flex items-start gap-2">
                       <div
-                        className="w-1 h-full min-h-10 rounded-full flex-shrink-0"
+                        className="w-1 min-h-10 rounded-full flex-shrink-0"
                         style={{ backgroundColor: session.class_types.color }}
                       />
                       <div className="flex-1 min-w-0">
@@ -306,21 +366,25 @@ export function WeeklyCalendar({
                           <p className="text-white text-sm font-medium truncate">
                             {session.class_types.name}
                           </p>
-                          {isBooked ? (
-                            <Badge variant="green">Inscrit</Badge>
-                          ) : isFull ? (
-                            <Badge variant="red">Complet</Badge>
-                          ) : null}
+                          {getSessionBadge(session)}
                         </div>
                         <p className="text-gray-500 text-xs mt-0.5">
-                          {formatTime(session.start_time)} —{" "}
-                          {formatTime(session.end_time)} •{" "}
+                          {formatTime(session.start_time)} — {formatTime(session.end_time)} •{" "}
                           {session.coach_name}
                         </p>
-                        <p className="text-gray-600 text-xs mt-0.5">
-                          {session.current_participants}/
-                          {session.max_participants} places
-                        </p>
+                        {!isIndividual && (
+                          <p className="text-gray-600 text-xs mt-0.5">
+                            {session.current_participants}/{session.max_participants} places
+                            {isFull && " · Complet"}
+                          </p>
+                        )}
+                        {isIndividual && (
+                          <p className="text-blue-400 text-xs mt-0.5 font-medium">
+                            {isAdmin && session.assigned_member_name
+                              ? session.assigned_member_name
+                              : "Cours individuel"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -343,16 +407,10 @@ export function WeeklyCalendar({
             return (
               <div key={dayIdx} className="min-w-0">
                 <div
-                  className={`text-center mb-2 py-2 rounded-lg ${
-                    isToday ? "bg-[#D4AF37]/10" : ""
-                  }`}
+                  className={`text-center mb-2 py-2 rounded-lg ${isToday ? "bg-[#D4AF37]/10" : ""}`}
                 >
                   <p className="text-xs text-gray-500">{DAYS_FR[dayIdx]}</p>
-                  <p
-                    className={`text-sm font-bold mt-0.5 ${
-                      isToday ? "text-[#D4AF37]" : "text-white"
-                    }`}
-                  >
+                  <p className={`text-sm font-bold mt-0.5 ${isToday ? "text-[#D4AF37]" : "text-white"}`}>
                     {day.getDate()}
                   </p>
                 </div>
@@ -360,12 +418,18 @@ export function WeeklyCalendar({
                 <div className="space-y-1.5">
                   {daySessions.map((session) => {
                     const isBooked = bookings[session.id] === "confirmed";
+                    const isIndividual = session.session_type === "individual";
+
                     return (
                       <div
                         key={session.id}
-                        className="rounded-lg p-2 cursor-pointer hover:opacity-90 transition-opacity border border-white/5"
+                        className={`rounded-lg p-2 cursor-pointer hover:opacity-90 transition-opacity ${
+                          isBooked ? "ring-1 ring-[#D4AF37]/50" : ""
+                        } ${isIndividual ? "border border-blue-500/30" : "border border-white/5"}`}
                         style={{
-                          backgroundColor: session.class_types.color + "20",
+                          backgroundColor: isBooked
+                            ? session.class_types.color + "30"
+                            : session.class_types.color + "20",
                           borderLeftColor: session.class_types.color,
                           borderLeftWidth: "3px",
                         }}
@@ -383,6 +447,13 @@ export function WeeklyCalendar({
                         <p className="text-xs text-gray-400 mt-0.5">
                           {formatTime(session.start_time)}
                         </p>
+                        {isIndividual && (
+                          <p className="text-xs text-blue-400 mt-0.5 truncate">
+                            {isAdmin && session.assigned_member_name
+                              ? session.assigned_member_name
+                              : "Individuel"}
+                          </p>
+                        )}
                         {isBooked && (
                           <div className="mt-1">
                             <Badge variant="green">✓</Badge>
@@ -416,6 +487,15 @@ export function WeeklyCalendar({
               }}
             />
 
+            {/* Session type badge */}
+            <div className="flex gap-2">
+              {selectedSession.session_type === "collective" ? (
+                <Badge variant="gray">Cours collectif</Badge>
+              ) : (
+                <Badge variant="blue">Cours individuel</Badge>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#1a1a1a] rounded-lg p-3">
                 <p className="text-xs text-gray-500 mb-1">Horaire</p>
@@ -431,14 +511,24 @@ export function WeeklyCalendar({
                   {selectedSession.coach_name}
                 </p>
               </div>
-              <div className="bg-[#1a1a1a] rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Places</p>
-                <p className="text-white text-sm font-medium flex items-center gap-1">
-                  <Users size={12} />
-                  {selectedSession.current_participants}/
-                  {selectedSession.max_participants}
-                </p>
-              </div>
+              {selectedSession.session_type === "collective" && (
+                <div className="bg-[#1a1a1a] rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Places</p>
+                  <p className="text-white text-sm font-medium flex items-center gap-1">
+                    <Users size={12} />
+                    {selectedSession.current_participants}/{selectedSession.max_participants}
+                  </p>
+                </div>
+              )}
+              {selectedSession.session_type === "individual" && selectedSession.assigned_member_name && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Adhérent</p>
+                  <p className="text-blue-400 text-sm font-medium flex items-center gap-1">
+                    <User size={12} />
+                    {selectedSession.assigned_member_name}
+                  </p>
+                </div>
+              )}
               <div className="bg-[#1a1a1a] rounded-lg p-3">
                 <p className="text-xs text-gray-500 mb-1">Annulation</p>
                 <p className="text-white text-sm font-medium flex items-center gap-1">
@@ -449,9 +539,7 @@ export function WeeklyCalendar({
             </div>
 
             {selectedSession.class_types.description && (
-              <p className="text-gray-400 text-sm">
-                {selectedSession.class_types.description}
-              </p>
+              <p className="text-gray-400 text-sm">{selectedSession.class_types.description}</p>
             )}
 
             {bookingError && (
@@ -461,19 +549,17 @@ export function WeeklyCalendar({
               </div>
             )}
 
-            {memberId && (
+            {memberId && !isAdmin && selectedSession.session_type === "collective" && (
               <div className="space-y-2">
-                {!isAdmin && (
-                  <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-3">
-                    <Zap size={14} className="text-[#D4AF37]" />
-                    <p className="text-xs text-gray-400">
-                      Votre solde :{" "}
-                      <span className="text-[#D4AF37] font-semibold">
-                        {sessionBalance} séance(s)
-                      </span>
-                    </p>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-3">
+                  <Zap size={14} className="text-[#D4AF37]" />
+                  <p className="text-xs text-gray-400">
+                    Solde collectif :{" "}
+                    <span className="text-[#D4AF37] font-semibold">
+                      {collectiveBalance} séance(s)
+                    </span>
+                  </p>
+                </div>
 
                 {bookings[selectedSession.id] === "confirmed" ? (
                   <Button
@@ -490,15 +576,60 @@ export function WeeklyCalendar({
                     onClick={() => handleBook(selectedSession)}
                     loading={booking}
                     disabled={
-                      selectedSession.current_participants >=
-                        selectedSession.max_participants ||
-                      (sessionBalance <= 0 && !isAdmin)
+                      selectedSession.current_participants >= selectedSession.max_participants ||
+                      collectiveBalance <= 0
                     }
                   >
-                    {selectedSession.current_participants >=
-                    selectedSession.max_participants
+                    {selectedSession.current_participants >= selectedSession.max_participants
                       ? "Cours complet"
-                      : "S'inscrire (1 séance)"}
+                      : "S'inscrire (1 séance collective)"}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {memberId && !isAdmin && selectedSession.session_type === "individual" && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-sm text-blue-400">
+                  Ce cours individuel a été planifié par votre coach.
+                </p>
+                {bookings[selectedSession.id] === "confirmed" && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-3 text-red-400 border-red-400/30 hover:bg-red-400/10"
+                    onClick={() => handleBook(selectedSession)}
+                    loading={booking}
+                  >
+                    Annuler ma participation
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Admin view */}
+            {isAdmin && (
+              <div className="space-y-2">
+                <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
+                  <Users size={14} className="text-gray-400" />
+                  <p className="text-xs text-gray-400">
+                    {selectedSession.session_type === "collective"
+                      ? `${selectedSession.current_participants}/${selectedSession.max_participants} inscrits`
+                      : selectedSession.assigned_member_name
+                      ? `Adhérent : ${selectedSession.assigned_member_name}`
+                      : "Cours individuel — aucun adhérent assigné"}
+                  </p>
+                </div>
+                {onRequestEdit && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSelectedSession(null);
+                      onRequestEdit(selectedSession);
+                    }}
+                  >
+                    <Pencil size={14} />
+                    Modifier ce cours
                   </Button>
                 )}
               </div>

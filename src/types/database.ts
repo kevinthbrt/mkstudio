@@ -18,7 +18,8 @@ export interface Database {
           email: string;
           phone: string | null;
           role: "admin" | "member";
-          session_balance: number;
+          collective_balance: number;
+          individual_balance: number;
           created_at: string;
           updated_at: string;
         };
@@ -30,7 +31,8 @@ export interface Database {
           email: string;
           phone?: string | null;
           role?: "admin" | "member";
-          session_balance?: number;
+          collective_balance?: number;
+          individual_balance?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -42,7 +44,8 @@ export interface Database {
           email?: string;
           phone?: string | null;
           role?: "admin" | "member";
-          session_balance?: number;
+          collective_balance?: number;
+          individual_balance?: number;
           updated_at?: string;
         };
         Relationships: [];
@@ -54,6 +57,7 @@ export interface Database {
           description: string | null;
           price: number;
           session_count: number;
+          session_type: "collective" | "individual";
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -64,6 +68,7 @@ export interface Database {
           description?: string | null;
           price: number;
           session_count: number;
+          session_type?: "collective" | "individual";
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -74,6 +79,7 @@ export interface Database {
           description?: string | null;
           price?: number;
           session_count?: number;
+          session_type?: "collective" | "individual";
           active?: boolean;
           updated_at?: string;
         };
@@ -215,6 +221,8 @@ export interface Database {
           min_cancel_hours: number;
           is_cancelled: boolean;
           recurring_rule: string | null;
+          session_type: "collective" | "individual";
+          assigned_member_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -228,6 +236,8 @@ export interface Database {
           min_cancel_hours?: number;
           is_cancelled?: boolean;
           recurring_rule?: string | null;
+          session_type?: "collective" | "individual";
+          assigned_member_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -240,6 +250,8 @@ export interface Database {
           min_cancel_hours?: number;
           is_cancelled?: boolean;
           recurring_rule?: string | null;
+          session_type?: "collective" | "individual";
+          assigned_member_id?: string | null;
         };
         Relationships: [];
       };
@@ -274,6 +286,22 @@ export interface Database {
       [_ in never]?: never;
     };
     Functions: {
+      increment_collective_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      decrement_collective_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      increment_individual_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      decrement_individual_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
       increment_session_balance: {
         Args: { p_member_id: string };
         Returns: undefined;
@@ -289,6 +317,10 @@ export interface Database {
       decrement_participants: {
         Args: { session_id: string };
         Returns: undefined;
+      };
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
       };
     };
     Enums: {

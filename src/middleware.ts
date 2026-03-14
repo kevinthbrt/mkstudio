@@ -2,11 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Let CORS preflight requests pass through
+  if (request.method === "OPTIONS") {
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are missing, allow all requests (fail open rather than crash)
+  // If env vars are missing, fail closed — redirect to login for all protected routes
   if (!supabaseUrl || !supabaseAnonKey) {
+    const pathname = request.nextUrl.pathname;
+    const publicRoutes = ["/login", "/register", "/"];
+    if (!publicRoutes.includes(pathname)) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
     return NextResponse.next({ request });
   }
 

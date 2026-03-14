@@ -45,23 +45,30 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         onClick={onClose}
       />
       <div
         className={cn(
-          "relative bg-[#111111] border border-[#1f1f1f] w-full rounded-t-2xl sm:rounded-2xl shadow-2xl",
-          "max-h-[90vh] overflow-y-auto",
+          "relative w-full rounded-t-3xl sm:rounded-2xl shadow-2xl",
+          "bg-gradient-to-br from-[#1e1c2d] to-[#191828]",
+          "border border-[#2d2b40] border-b-0 sm:border-b",
+          "max-h-[92vh] overflow-y-auto",
           sizes[size],
           className
         )}
       >
+        {/* Pull indicator on mobile */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-[#3d3a58]" />
+        </div>
+
         {title && (
-          <div className="flex items-center justify-between p-5 border-b border-[#1f1f1f] sticky top-0 bg-[#111111] z-10">
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2d2b40] sticky top-0 bg-[#1e1c2d] z-10">
+            <h2 className="text-base font-bold text-white">{title}</h2>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
             >
               <X size={16} />
             </button>

@@ -63,14 +63,19 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (orderError) {
-    return NextResponse.json({ error: orderError.message }, { status: 500 });
+    console.error("[orders] insert error:", orderError.message);
+    return NextResponse.json({ error: "Une erreur est survenue lors de la création de la commande." }, { status: 500 });
   }
+
+  const sessionType = product.session_type || "collective";
+  const balanceField = sessionType === "individual" ? "individual_balance" : "collective_balance";
+  const currentBalance = sessionType === "individual"
+    ? profile.individual_balance
+    : profile.collective_balance;
 
   await supabase
     .from("profiles")
-    .update({
-      session_balance: profile.session_balance + product.session_count,
-    })
+    .update({ [balanceField]: currentBalance + product.session_count })
     .eq("id", profile.id);
 
   if (invoiceSettings) {

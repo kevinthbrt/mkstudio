@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { User, Phone, Mail, Save, CheckCircle } from "lucide-react";
+import { User, Phone, Mail, Save, CheckCircle, Users, Zap } from "lucide-react";
 import type { Profile } from "@/types/database";
 
 export default function ProfilePage() {
@@ -104,21 +104,25 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Session balance */}
-      <Card className="p-5 border-[#D4AF37]/20">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-gray-400 text-sm">Solde de séances</p>
-            <p className="text-4xl font-bold text-white mt-1">
-              {profile?.session_balance}
-            </p>
-            <p className="text-gray-500 text-xs mt-0.5">séances disponibles</p>
+      {/* Session balances */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4 border-[#D4AF37]/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Users size={14} className="text-[#D4AF37]" />
+            <p className="text-gray-400 text-xs">Solde collectif</p>
           </div>
-          <div className="w-14 h-14 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center">
-            <span className="text-2xl">⚡</span>
+          <p className="text-3xl font-bold text-white">{profile?.collective_balance}</p>
+          <p className="text-gray-600 text-xs mt-0.5">séances</p>
+        </Card>
+        <Card className="p-4 border-blue-500/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap size={14} className="text-blue-400" />
+            <p className="text-gray-400 text-xs">Solde individuel</p>
           </div>
-        </div>
-      </Card>
+          <p className="text-3xl font-bold text-white">{profile?.individual_balance}</p>
+          <p className="text-gray-600 text-xs mt-0.5">séances</p>
+        </Card>
+      </div>
 
       {/* Edit form */}
       <Card className="p-5">
