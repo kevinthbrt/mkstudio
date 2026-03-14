@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Calendar, Clock, User, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, User, AlertTriangle, Users, Zap } from "lucide-react";
 import { formatDateTime, formatTime } from "@/lib/utils";
 
 interface BookingWithSession {
@@ -20,6 +20,7 @@ interface BookingWithSession {
     coach_name: string;
     min_cancel_hours: number;
     is_cancelled: boolean;
+    session_type: string;
     class_types: {
       name: string;
       color: string;
@@ -32,7 +33,8 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string>("");
-  const [sessionBalance, setSessionBalance] = useState(0);
+  const [collectiveBalance, setCollectiveBalance] = useState(0);
+  const [individualBalance, setIndividualBalance] = useState(0);
 
   useEffect(() => {
     loadBookings();
@@ -47,20 +49,21 @@ export default function SessionsPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, session_balance")
+      .select("id, collective_balance, individual_balance")
       .eq("user_id", user.id)
       .single();
 
     if (!profile) return;
     setProfileId(profile.id);
-    setSessionBalance(profile.session_balance);
+    setCollectiveBalance(profile.collective_balance);
+    setIndividualBalance(profile.individual_balance);
 
     const { data } = await supabase
       .from("class_bookings")
       .select(`
         *,
         class_sessions (
-          id, start_time, end_time, coach_name, min_cancel_hours, is_cancelled,
+          id, start_time, end_time, coach_name, min_cancel_hours, is_cancelled, session_type,
           class_types (name, color)
         )
       `)
@@ -76,8 +79,7 @@ export default function SessionsPage() {
     if (booking.class_sessions.is_cancelled) return false;
     const sessionStart = new Date(booking.class_sessions.start_time);
     const now = new Date();
-    const hoursUntilSession =
-      (sessionStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilSession = (sessionStart.getTime() - now.getTime()) / (1000 * 60 * 60);
     return hoursUntilSession >= booking.class_sessions.min_cancel_hours;
   }
 
@@ -85,27 +87,24 @@ export default function SessionsPage() {
     setCancellingId(booking.id);
     const supabase = createClient();
 
-    // Cancel booking
     await supabase
       .from("class_bookings")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-      })
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", booking.id);
 
-    // Decrement participants
     await supabase.rpc("decrement_participants", {
       session_id: booking.class_sessions.id,
     });
 
-    // Recrédit session if debited
     if (booking.session_debited) {
-      await supabase
-        .from("profiles")
-        .update({ session_balance: sessionBalance + 1 })
-        .eq("id", profileId);
-      setSessionBalance((s) => s + 1);
+      const isIndividual = booking.class_sessions.session_type === "individual";
+      if (isIndividual) {
+        await supabase.rpc("increment_individual_balance", { p_member_id: profileId });
+        setIndividualBalance((s) => s + 1);
+      } else {
+        await supabase.rpc("increment_collective_balance", { p_member_id: profileId });
+        setCollectiveBalance((s) => s + 1);
+      }
     }
 
     setCancellingId(null);
@@ -113,14 +112,10 @@ export default function SessionsPage() {
   }
 
   const upcomingBookings = bookings.filter(
-    (b) =>
-      b.status === "confirmed" &&
-      new Date(b.class_sessions.start_time) >= new Date()
+    (b) => b.status === "confirmed" && new Date(b.class_sessions.start_time) >= new Date()
   );
   const pastBookings = bookings.filter(
-    (b) =>
-      b.status === "cancelled" ||
-      new Date(b.class_sessions.start_time) < new Date()
+    (b) => b.status === "cancelled" || new Date(b.class_sessions.start_time) < new Date()
   );
 
   if (loading) {
@@ -133,14 +128,27 @@ export default function SessionsPage() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Mes séances</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Solde actuel :{" "}
-          <span className="text-[#D4AF37] font-semibold">
-            {sessionBalance} séance(s)
-          </span>
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Mes séances</h1>
+          <p className="text-gray-500 text-sm mt-1">Historique de vos cours</p>
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 bg-[#111111] border border-[#D4AF37]/20 rounded-xl px-3 py-2">
+            <Users size={14} className="text-[#D4AF37]" />
+            <div>
+              <p className="text-[#D4AF37] font-bold text-sm">{collectiveBalance}</p>
+              <p className="text-gray-500 text-xs">collectif</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-[#111111] border border-blue-500/20 rounded-xl px-3 py-2">
+            <Zap size={14} className="text-blue-400" />
+            <div>
+              <p className="text-blue-400 font-bold text-sm">{individualBalance}</p>
+              <p className="text-gray-500 text-xs">individuel</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Upcoming */}
@@ -161,30 +169,25 @@ export default function SessionsPage() {
             {upcomingBookings.map((booking) => {
               const cancellable = canCancel(booking);
               const sessionStart = new Date(booking.class_sessions.start_time);
-              const hoursLeft =
-                (sessionStart.getTime() - new Date().getTime()) /
-                (1000 * 60 * 60);
+              const hoursLeft = (sessionStart.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+              const isIndividual = booking.class_sessions.session_type === "individual";
 
               return (
-                <div
-                  key={booking.id}
-                  className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4"
-                >
+                <div key={booking.id} className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <div
-                      className="w-1.5 h-full min-h-12 rounded-full flex-shrink-0 mt-0.5"
-                      style={{
-                        backgroundColor:
-                          booking.class_sessions.class_types?.color ||
-                          "#D4AF37",
-                      }}
+                      className="w-1.5 min-h-12 rounded-full flex-shrink-0 mt-0.5"
+                      style={{ backgroundColor: booking.class_sessions.class_types?.color || "#D4AF37" }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-white font-medium">
                           {booking.class_sessions.class_types?.name}
                         </p>
-                        <Badge variant="green">Confirmé</Badge>
+                        <div className="flex gap-1">
+                          <Badge variant="green">Confirmé</Badge>
+                          {isIndividual && <Badge variant="blue">Individuel</Badge>}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                         <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -205,9 +208,7 @@ export default function SessionsPage() {
                       {!cancellable && hoursLeft > 0 && (
                         <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-400">
                           <AlertTriangle size={12} />
-                          Annulation impossible (moins de{" "}
-                          {booking.class_sessions.min_cancel_hours}h avant le
-                          cours)
+                          Annulation impossible (moins de {booking.class_sessions.min_cancel_hours}h avant le cours)
                         </div>
                       )}
                     </div>
@@ -247,10 +248,7 @@ export default function SessionsPage() {
               >
                 <div
                   className="w-1.5 h-10 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor:
-                      booking.class_sessions.class_types?.color || "#D4AF37",
-                  }}
+                  style={{ backgroundColor: booking.class_sessions.class_types?.color || "#D4AF37" }}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-medium">
