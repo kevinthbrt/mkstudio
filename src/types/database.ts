@@ -220,6 +220,7 @@ export interface Database {
           current_participants: number;
           min_cancel_hours: number;
           is_cancelled: boolean;
+          is_hidden: boolean;
           recurring_rule: string | null;
           session_type: "collective" | "individual";
           assigned_member_id: string | null;
@@ -235,6 +236,7 @@ export interface Database {
           current_participants?: number;
           min_cancel_hours?: number;
           is_cancelled?: boolean;
+          is_hidden?: boolean;
           recurring_rule?: string | null;
           session_type?: "collective" | "individual";
           assigned_member_id?: string | null;
@@ -249,6 +251,7 @@ export interface Database {
           current_participants?: number;
           min_cancel_hours?: number;
           is_cancelled?: boolean;
+          is_hidden?: boolean;
           recurring_rule?: string | null;
           session_type?: "collective" | "individual";
           assigned_member_id?: string | null;

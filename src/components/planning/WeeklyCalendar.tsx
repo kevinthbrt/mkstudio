@@ -14,6 +14,8 @@ import {
   Zap,
   AlertTriangle,
   Pencil,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import {
   getWeekDays,
@@ -32,6 +34,7 @@ export interface ClassSessionWithType {
   current_participants: number;
   min_cancel_hours: number;
   is_cancelled: boolean;
+  is_hidden: boolean;
   session_type: "collective" | "individual";
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
@@ -48,6 +51,7 @@ interface CalendarProps {
   individualBalance?: number;
   isAdmin?: boolean;
   onRequestEdit?: (session: ClassSessionWithType) => void;
+  onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -59,6 +63,7 @@ export function WeeklyCalendar({
   individualBalance = 0,
   isAdmin = false,
   onRequestEdit,
+  onToggleVisibility,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
@@ -67,6 +72,7 @@ export function WeeklyCalendar({
   const [selectedSession, setSelectedSession] = useState<ClassSessionWithType | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -340,12 +346,15 @@ export function WeeklyCalendar({
                 const isBooked = bookings[session.id] === "confirmed";
                 const isFull = session.current_participants >= session.max_participants;
                 const isIndividual = session.session_type === "individual";
+                const isHidden = session.is_hidden;
 
                 return (
                   <div
                     key={session.id}
                     className={`border rounded-xl p-3 mb-2 cursor-pointer transition-colors ${
-                      isBooked
+                      isHidden && isAdmin
+                        ? "bg-[#111111] border-[#2a2a2a] border-dashed opacity-60"
+                        : isBooked
                         ? "bg-[#D4AF37]/10 border-[#D4AF37]/30"
                         : isIndividual
                         ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
@@ -366,7 +375,12 @@ export function WeeklyCalendar({
                           <p className="text-white text-sm font-medium truncate">
                             {session.class_types.name}
                           </p>
-                          {getSessionBadge(session)}
+                          <div className="flex items-center gap-1">
+                            {isHidden && isAdmin && (
+                              <EyeOff size={12} className="text-gray-500" />
+                            )}
+                            {getSessionBadge(session)}
+                          </div>
                         </div>
                         <p className="text-gray-500 text-xs mt-0.5">
                           {formatTime(session.start_time)} — {formatTime(session.end_time)} •{" "}
@@ -419,12 +433,17 @@ export function WeeklyCalendar({
                   {daySessions.map((session) => {
                     const isBooked = bookings[session.id] === "confirmed";
                     const isIndividual = session.session_type === "individual";
+                    const isHidden = session.is_hidden;
 
                     return (
                       <div
                         key={session.id}
                         className={`rounded-lg p-2 cursor-pointer hover:opacity-90 transition-opacity ${
-                          isBooked ? "ring-1 ring-[#D4AF37]/50" : ""
+                          isHidden && isAdmin
+                            ? "opacity-50 border-dashed"
+                            : isBooked
+                            ? "ring-1 ring-[#D4AF37]/50"
+                            : ""
                         } ${isIndividual ? "border border-blue-500/30" : "border border-white/5"}`}
                         style={{
                           backgroundColor: isBooked
@@ -438,12 +457,17 @@ export function WeeklyCalendar({
                           setBookingError("");
                         }}
                       >
-                        <p
-                          className="text-xs font-semibold truncate"
-                          style={{ color: session.class_types.color }}
-                        >
-                          {session.class_types.name}
-                        </p>
+                        <div className="flex items-center gap-1">
+                          <p
+                            className="text-xs font-semibold truncate flex-1"
+                            style={{ color: session.class_types.color }}
+                          >
+                            {session.class_types.name}
+                          </p>
+                          {isHidden && isAdmin && (
+                            <EyeOff size={10} className="text-gray-500 flex-shrink-0" />
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 mt-0.5">
                           {formatTime(session.start_time)}
                         </p>
@@ -619,6 +643,46 @@ export function WeeklyCalendar({
                       : "Cours individuel — aucun adhérent assigné"}
                   </p>
                 </div>
+
+                {onToggleVisibility && selectedSession.session_type === "collective" && (
+                  <Button
+                    variant="outline"
+                    className={`w-full ${
+                      selectedSession.is_hidden
+                        ? "text-green-400 border-green-400/30 hover:bg-green-400/10"
+                        : "text-gray-400 border-gray-400/30 hover:bg-gray-400/10"
+                    }`}
+                    loading={togglingVisibility}
+                    onClick={async () => {
+                      setTogglingVisibility(true);
+                      await onToggleVisibility(selectedSession);
+                      setSessions((s) =>
+                        s.map((sess) =>
+                          sess.id === selectedSession.id
+                            ? { ...sess, is_hidden: !sess.is_hidden }
+                            : sess
+                        )
+                      );
+                      setSelectedSession((prev) =>
+                        prev ? { ...prev, is_hidden: !prev.is_hidden } : null
+                      );
+                      setTogglingVisibility(false);
+                    }}
+                  >
+                    {selectedSession.is_hidden ? (
+                      <>
+                        <Eye size={14} />
+                        Rendre visible aux membres
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff size={14} />
+                        Masquer aux membres
+                      </>
+                    )}
+                  </Button>
+                )}
+
                 {onRequestEdit && (
                   <Button
                     variant="outline"
