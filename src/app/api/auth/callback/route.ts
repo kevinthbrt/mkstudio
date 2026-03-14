@@ -27,6 +27,26 @@ export async function GET(request: NextRequest) {
       }
     );
     await supabase.auth.exchangeCodeForSession(code);
+
+    // Ensure profile exists (fallback if the DB trigger didn't fire)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!existingProfile) {
+        await supabase.from("profiles").insert({
+          user_id: user.id,
+          first_name: user.user_metadata?.first_name || "",
+          last_name: user.user_metadata?.last_name || "",
+          email: user.email || "",
+          role: user.user_metadata?.role || "member",
+        });
+      }
+    }
   }
 
   return NextResponse.redirect(`${origin}/dashboard`);

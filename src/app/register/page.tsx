@@ -61,7 +61,24 @@ export default function RegisterPage() {
     }
 
     // If session is returned immediately (email confirmation disabled)
-    if (data.session) {
+    if (data.session && data.user) {
+      // Ensure profile exists (fallback if the DB trigger didn't fire)
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", data.user.id)
+        .single();
+
+      if (!existingProfile) {
+        await supabase.from("profiles").insert({
+          user_id: data.user.id,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          role: "member",
+        });
+      }
+
       router.push("/dashboard");
       return;
     }

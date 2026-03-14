@@ -23,7 +23,7 @@ export function Button({
     "inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0e0d14] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none";
 
   const variants = {
-    gold: "bg-gradient-to-r from-[#C9A227] via-[#E8C84A] to-[#C9A227] bg-size-200 text-[#0a0a0a] font-bold hover:shadow-[0_4px_24px_rgba(212,175,55,0.5)] hover:-translate-y-0.5 active:translate-y-0 focus:ring-[#D4AF37]",
+    gold: "bg-[linear-gradient(to_right,#C9A227,#E8C84A,#C9A227)] text-[#0a0a0a] font-bold hover:shadow-[0_4px_24px_rgba(212,175,55,0.5)] hover:-translate-y-0.5 active:translate-y-0 focus:ring-[#D4AF37]",
     outline:
       "bg-transparent border border-[#2d2b40] text-gray-300 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 focus:ring-[#D4AF37]/30",
     ghost:
