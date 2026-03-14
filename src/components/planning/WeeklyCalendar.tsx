@@ -86,7 +86,7 @@ export function WeeklyCalendar({
       .eq("is_cancelled", false)
       .order("start_time");
 
-    setSessions((sessionsData as ClassSessionWithType[]) || []);
+    setSessions((sessionsData as unknown as ClassSessionWithType[]) || []);
 
     if (memberId) {
       const { data: bookingsData } = await supabase
