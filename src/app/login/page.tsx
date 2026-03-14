@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Lock, Mail } from "lucide-react";
@@ -105,7 +106,14 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-4">
+        <p className="text-center text-sm text-gray-500 mt-4">
+          Pas encore de compte ?{" "}
+          <Link href="/register" className="text-[#D4AF37] font-semibold hover:underline">
+            S&apos;inscrire
+          </Link>
+        </p>
+
+        <p className="text-center text-xs text-gray-600 mt-3">
           MK Studio © {new Date().getFullYear()} — Tous droits réservés
         </p>
       </div>

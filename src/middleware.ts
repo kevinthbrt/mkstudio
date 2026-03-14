@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname;
 
-    const publicRoutes = ["/login", "/register", "/", "/setup"];
+    const publicRoutes = ["/login", "/register", "/"];
     const isPublicRoute = publicRoutes.includes(pathname);
     const isAuthRoute = pathname === "/login" || pathname === "/register";
 
@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
   } catch {
     // On error, redirect to login for protected routes
     const pathname = request.nextUrl.pathname;
-    const publicRoutes = ["/login", "/register", "/", "/setup"];
+    const publicRoutes = ["/login", "/register", "/"];
     if (!publicRoutes.includes(pathname)) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

@@ -20,7 +20,7 @@ export default async function MemberLayout({
     .eq("user_id", user.id)
     .single();
 
-  if (!profile) redirect("/setup");
+  if (!profile) redirect("/login");
   if (profile.role === "admin") redirect("/admin");
 
   return (

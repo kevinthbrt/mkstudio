@@ -20,8 +20,7 @@ export default async function AdminLayout({
     .eq("user_id", user.id)
     .single();
 
-  // DB not set up yet or profile missing
-  if (error || !profile) redirect("/setup");
+  if (error || !profile) redirect("/login");
 
   if (profile.role !== "admin") redirect("/dashboard");
 
