@@ -13,6 +13,7 @@ import {
   User,
   Zap,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import {
   getWeekDays,
@@ -21,8 +22,9 @@ import {
   formatDate,
 } from "@/lib/utils";
 
-interface ClassSessionWithType {
+export interface ClassSessionWithType {
   id: string;
+  class_type_id: string;
   start_time: string;
   end_time: string;
   coach_name: string;
@@ -32,6 +34,7 @@ interface ClassSessionWithType {
   is_cancelled: boolean;
   session_type: "collective" | "individual";
   assigned_member_id: string | null;
+  assigned_member_name?: string | null;
   class_types: {
     name: string;
     color: string;
@@ -44,6 +47,7 @@ interface CalendarProps {
   collectiveBalance?: number;
   individualBalance?: number;
   isAdmin?: boolean;
+  onRequestEdit?: (session: ClassSessionWithType) => void;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -54,6 +58,7 @@ export function WeeklyCalendar({
   collectiveBalance = 0,
   individualBalance = 0,
   isAdmin = false,
+  onRequestEdit,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
@@ -76,8 +81,6 @@ export function WeeklyCalendar({
     const start = weekDays[0].toISOString();
     const end = new Date(weekDays[6].getTime() + 86400000).toISOString();
 
-    // Members see collective + their individual sessions (filtered by RLS)
-    // Admins see all sessions
     const { data: sessionsData } = await supabase
       .from("class_sessions")
       .select(`*, class_types (name, color, description)`)
@@ -86,7 +89,43 @@ export function WeeklyCalendar({
       .eq("is_cancelled", false)
       .order("start_time");
 
-    setSessions((sessionsData as unknown as ClassSessionWithType[]) || []);
+    const rawSessions = (sessionsData as unknown as ClassSessionWithType[]) || [];
+
+    // For admin: fetch names for individual sessions' assigned members
+    if (isAdmin) {
+      const memberIds = [
+        ...new Set(
+          rawSessions
+            .filter((s) => s.session_type === "individual" && s.assigned_member_id)
+            .map((s) => s.assigned_member_id as string)
+        ),
+      ];
+
+      if (memberIds.length > 0) {
+        const { data: membersData } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", memberIds);
+
+        const memberMap: Record<string, string> = {};
+        (membersData || []).forEach((m: any) => {
+          memberMap[m.id] = `${m.first_name} ${m.last_name}`;
+        });
+
+        setSessions(
+          rawSessions.map((s) => ({
+            ...s,
+            assigned_member_name: s.assigned_member_id
+              ? memberMap[s.assigned_member_id] ?? null
+              : null,
+          }))
+        );
+      } else {
+        setSessions(rawSessions);
+      }
+    } else {
+      setSessions(rawSessions);
+    }
 
     if (memberId) {
       const { data: bookingsData } = await supabase
@@ -106,7 +145,6 @@ export function WeeklyCalendar({
 
   async function handleBook(session: ClassSessionWithType) {
     if (!memberId) return;
-    // Only collective sessions can be self-booked by members
     if (!isAdmin && session.session_type === "individual") return;
 
     setBooking(true);
@@ -115,7 +153,6 @@ export function WeeklyCalendar({
     const isBooked = bookings[session.id] === "confirmed";
 
     if (isBooked) {
-      // Cancel booking
       const supabase = createClient();
       const sessionStart = new Date(session.start_time);
       const now = new Date();
@@ -163,7 +200,6 @@ export function WeeklyCalendar({
         )
       );
     } else {
-      // Book session — only collective for members
       const balance = session.session_type === "individual" ? individualBalance : collectiveBalance;
 
       if (balance <= 0 && !isAdmin) {
@@ -344,7 +380,9 @@ export function WeeklyCalendar({
                         )}
                         {isIndividual && (
                           <p className="text-blue-400 text-xs mt-0.5 font-medium">
-                            Cours individuel
+                            {isAdmin && session.assigned_member_name
+                              ? session.assigned_member_name
+                              : "Cours individuel"}
                           </p>
                         )}
                       </div>
@@ -410,7 +448,11 @@ export function WeeklyCalendar({
                           {formatTime(session.start_time)}
                         </p>
                         {isIndividual && (
-                          <p className="text-xs text-blue-400 mt-0.5">Individuel</p>
+                          <p className="text-xs text-blue-400 mt-0.5 truncate">
+                            {isAdmin && session.assigned_member_name
+                              ? session.assigned_member_name
+                              : "Individuel"}
+                          </p>
                         )}
                         {isBooked && (
                           <div className="mt-1">
@@ -475,6 +517,15 @@ export function WeeklyCalendar({
                   <p className="text-white text-sm font-medium flex items-center gap-1">
                     <Users size={12} />
                     {selectedSession.current_participants}/{selectedSession.max_participants}
+                  </p>
+                </div>
+              )}
+              {selectedSession.session_type === "individual" && selectedSession.assigned_member_name && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Adhérent</p>
+                  <p className="text-blue-400 text-sm font-medium flex items-center gap-1">
+                    <User size={12} />
+                    {selectedSession.assigned_member_name}
                   </p>
                 </div>
               )}
@@ -555,15 +606,32 @@ export function WeeklyCalendar({
               </div>
             )}
 
-            {/* Admin view: show booking info only */}
+            {/* Admin view */}
             {isAdmin && (
-              <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
-                <Users size={14} className="text-gray-400" />
-                <p className="text-xs text-gray-400">
-                  {selectedSession.session_type === "collective"
-                    ? `${selectedSession.current_participants}/${selectedSession.max_participants} inscrits`
-                    : "Cours individuel — géré via la fiche adhérent"}
-                </p>
+              <div className="space-y-2">
+                <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
+                  <Users size={14} className="text-gray-400" />
+                  <p className="text-xs text-gray-400">
+                    {selectedSession.session_type === "collective"
+                      ? `${selectedSession.current_participants}/${selectedSession.max_participants} inscrits`
+                      : selectedSession.assigned_member_name
+                      ? `Adhérent : ${selectedSession.assigned_member_name}`
+                      : "Cours individuel — aucun adhérent assigné"}
+                  </p>
+                </div>
+                {onRequestEdit && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSelectedSession(null);
+                      onRequestEdit(selectedSession);
+                    }}
+                  >
+                    <Pencil size={14} />
+                    Modifier ce cours
+                  </Button>
+                )}
               </div>
             )}
           </div>

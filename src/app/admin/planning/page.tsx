@@ -5,9 +5,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { WeeklyCalendar } from "@/components/planning/WeeklyCalendar";
-import { Badge } from "@/components/ui/Badge";
-import { Plus, Palette, Trash2 } from "lucide-react";
+import { WeeklyCalendar, ClassSessionWithType } from "@/components/planning/WeeklyCalendar";
+import { Plus, Palette, Trash2, AlertTriangle } from "lucide-react";
 import type { ClassType, Profile } from "@/types/database";
 
 const COLOR_PRESETS = [
@@ -20,6 +19,8 @@ export default function AdminPlanningPage() {
   const [members, setMembers] = useState<Profile[]>([]);
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [showManageTypes, setShowManageTypes] = useState(false);
+  const [showEditSession, setShowEditSession] = useState(false);
+  const [editingSession, setEditingSession] = useState<ClassSessionWithType | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [sessionForm, setSessionForm] = useState({
@@ -36,6 +37,18 @@ export default function AdminPlanningPage() {
     weeks: "4",
   });
 
+  const [editForm, setEditForm] = useState({
+    class_type_id: "",
+    session_type: "collective" as "collective" | "individual",
+    assigned_member_id: "",
+    coach_name: "",
+    date: "",
+    start_hour: "09:00",
+    end_hour: "10:00",
+    max_participants: "10",
+    min_cancel_hours: "2",
+  });
+
   const [typeForm, setTypeForm] = useState({
     name: "",
     description: "",
@@ -44,6 +57,8 @@ export default function AdminPlanningPage() {
   });
 
   const [savingSession, setSavingSession] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [cancellingSession, setCancellingSession] = useState(false);
   const [savingType, setSavingType] = useState(false);
 
   useEffect(() => {
@@ -65,6 +80,28 @@ export default function AdminPlanningPage() {
       .eq("role", "member")
       .order("last_name");
     setMembers(data || []);
+  }
+
+  function openEditModal(session: ClassSessionWithType) {
+    const startDate = new Date(session.start_time);
+    const endDate = new Date(session.end_time);
+    const dateStr = startDate.toISOString().slice(0, 10);
+    const startHour = startDate.toTimeString().slice(0, 5);
+    const endHour = endDate.toTimeString().slice(0, 5);
+
+    setEditingSession(session);
+    setEditForm({
+      class_type_id: session.class_type_id,
+      session_type: session.session_type,
+      assigned_member_id: session.assigned_member_id ?? "",
+      coach_name: session.coach_name,
+      date: dateStr,
+      start_hour: startHour,
+      end_hour: endHour,
+      max_participants: String(session.max_participants),
+      min_cancel_hours: String(session.min_cancel_hours),
+    });
+    setShowEditSession(true);
   }
 
   async function handleCreateSession(e: React.FormEvent) {
@@ -112,7 +149,6 @@ export default function AdminPlanningPage() {
       });
     }
 
-    // For individual sessions, also auto-create the booking for the assigned member
     const { data: createdSessions } = await supabase
       .from("class_sessions")
       .insert(sessions)
@@ -129,7 +165,6 @@ export default function AdminPlanningPage() {
 
       await supabase.from("class_bookings").insert(bookings);
 
-      // Debit individual balance for each session
       for (let i = 0; i < createdSessions.length; i++) {
         await supabase.rpc("decrement_individual_balance", {
           p_member_id: sessionForm.assigned_member_id,
@@ -153,6 +188,121 @@ export default function AdminPlanningPage() {
       recurring: false,
       weeks: "4",
     });
+  }
+
+  async function handleEditSession(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingSession) return;
+    setSavingEdit(true);
+
+    const supabase = createClient();
+    const startTime = new Date(`${editForm.date}T${editForm.start_hour}:00`);
+    const endTime = new Date(`${editForm.date}T${editForm.end_hour}:00`);
+    const isIndividual = editForm.session_type === "individual";
+
+    await supabase
+      .from("class_sessions")
+      .update({
+        class_type_id: editForm.class_type_id,
+        coach_name: editForm.coach_name,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        max_participants: isIndividual ? 1 : parseInt(editForm.max_participants),
+        min_cancel_hours: parseInt(editForm.min_cancel_hours),
+        assigned_member_id: isIndividual ? editForm.assigned_member_id || null : null,
+      })
+      .eq("id", editingSession.id);
+
+    // If individual session's member changed, update the booking
+    if (isIndividual && editForm.assigned_member_id !== (editingSession.assigned_member_id ?? "")) {
+      // Cancel old booking if exists
+      if (editingSession.assigned_member_id) {
+        const { data: oldBooking } = await supabase
+          .from("class_bookings")
+          .select("id, session_debited")
+          .eq("class_session_id", editingSession.id)
+          .eq("member_id", editingSession.assigned_member_id)
+          .eq("status", "confirmed")
+          .single();
+
+        if (oldBooking) {
+          await supabase
+            .from("class_bookings")
+            .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+            .eq("id", oldBooking.id);
+
+          if (oldBooking.session_debited) {
+            await supabase.rpc("increment_individual_balance", {
+              p_member_id: editingSession.assigned_member_id,
+            });
+          }
+        }
+      }
+
+      // Create new booking for new member
+      if (editForm.assigned_member_id) {
+        await supabase.from("class_bookings").upsert(
+          {
+            member_id: editForm.assigned_member_id,
+            class_session_id: editingSession.id,
+            status: "confirmed",
+            session_debited: true,
+            booked_at: new Date().toISOString(),
+            cancelled_at: null,
+          },
+          { onConflict: "member_id,class_session_id" }
+        );
+        await supabase.rpc("decrement_individual_balance", {
+          p_member_id: editForm.assigned_member_id,
+        });
+      }
+    }
+
+    setSavingEdit(false);
+    setShowEditSession(false);
+    setEditingSession(null);
+    setRefreshKey((k) => k + 1);
+  }
+
+  async function handleCancelSession() {
+    if (!editingSession) return;
+    setCancellingSession(true);
+
+    const supabase = createClient();
+
+    // Refund all confirmed bookings
+    const { data: confirmedBookings } = await supabase
+      .from("class_bookings")
+      .select("id, member_id, session_debited")
+      .eq("class_session_id", editingSession.id)
+      .eq("status", "confirmed");
+
+    if (confirmedBookings && confirmedBookings.length > 0) {
+      await supabase
+        .from("class_bookings")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("class_session_id", editingSession.id)
+        .eq("status", "confirmed");
+
+      for (const b of confirmedBookings) {
+        if (b.session_debited) {
+          const rpcFn = editingSession.session_type === "individual"
+            ? "increment_individual_balance"
+            : "increment_collective_balance";
+          await supabase.rpc(rpcFn, { p_member_id: b.member_id });
+        }
+      }
+    }
+
+    await supabase
+      .from("class_sessions")
+      .update({ is_cancelled: true })
+      .eq("id", editingSession.id);
+
+    setCancellingSession(false);
+    setShowEditSession(false);
+    setEditingSession(null);
+    setRefreshKey((k) => k + 1);
   }
 
   async function handleCreateType(e: React.FormEvent) {
@@ -179,6 +329,7 @@ export default function AdminPlanningPage() {
   }
 
   const isIndividual = sessionForm.session_type === "individual";
+  const editIsIndividual = editForm.session_type === "individual";
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -201,7 +352,11 @@ export default function AdminPlanningPage() {
         </div>
       </div>
 
-      <WeeklyCalendar key={refreshKey} isAdmin />
+      <WeeklyCalendar
+        key={refreshKey}
+        isAdmin
+        onRequestEdit={openEditModal}
+      />
 
       {/* Create session modal */}
       <Modal
@@ -240,7 +395,6 @@ export default function AdminPlanningPage() {
             </div>
           </div>
 
-          {/* Member selection for individual sessions */}
           {isIndividual && (
             <Select
               label="Adhérent concerné"
@@ -398,6 +552,163 @@ export default function AdminPlanningPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit session modal */}
+      <Modal
+        open={showEditSession}
+        onClose={() => {
+          setShowEditSession(false);
+          setEditingSession(null);
+        }}
+        title="Modifier le cours"
+        size="lg"
+      >
+        {editingSession && (
+          <form onSubmit={handleEditSession} className="space-y-4">
+            {editIsIndividual && (
+              <Select
+                label="Adhérent concerné"
+                value={editForm.assigned_member_id}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, assigned_member_id: e.target.value })
+                }
+                options={[
+                  { value: "", label: "Aucun adhérent..." },
+                  ...members.map((m) => ({
+                    value: m.id,
+                    label: `${m.first_name} ${m.last_name}`,
+                  })),
+                ]}
+              />
+            )}
+
+            <Select
+              label="Type de cours"
+              value={editForm.class_type_id}
+              onChange={(e) =>
+                setEditForm({ ...editForm, class_type_id: e.target.value })
+              }
+              options={[
+                { value: "", label: "Sélectionner un type..." },
+                ...classTypes.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+              required
+            />
+
+            <Input
+              label="Nom du coach"
+              value={editForm.coach_name}
+              onChange={(e) =>
+                setEditForm({ ...editForm, coach_name: e.target.value })
+              }
+              placeholder="Ex: Marie Dupont"
+              required
+            />
+
+            <Input
+              label="Date"
+              type="date"
+              value={editForm.date}
+              onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+              required
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Heure de début"
+                type="time"
+                value={editForm.start_hour}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, start_hour: e.target.value })
+                }
+                required
+              />
+              <Input
+                label="Heure de fin"
+                type="time"
+                value={editForm.end_hour}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, end_hour: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            {!editIsIndividual && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Places max"
+                  type="number"
+                  min="1"
+                  value={editForm.max_participants}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, max_participants: e.target.value })
+                  }
+                  required
+                />
+                <Input
+                  label="Annulation min (heures)"
+                  type="number"
+                  min="0"
+                  value={editForm.min_cancel_hours}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, min_cancel_hours: e.target.value })
+                  }
+                />
+              </div>
+            )}
+
+            {editIsIndividual && (
+              <Input
+                label="Annulation min (heures)"
+                type="number"
+                min="0"
+                value={editForm.min_cancel_hours}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, min_cancel_hours: e.target.value })
+                }
+              />
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1"
+                onClick={() => {
+                  setShowEditSession(false);
+                  setEditingSession(null);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button type="submit" loading={savingEdit} className="flex-1">
+                Enregistrer
+              </Button>
+            </div>
+
+            {/* Danger zone */}
+            <div className="border-t border-[#1f1f1f] pt-4">
+              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                Zone dangereuse — action irréversible
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
+                onClick={handleCancelSession}
+                loading={cancellingSession}
+              >
+                Annuler et supprimer ce cours
+              </Button>
+              <p className="text-xs text-gray-600 text-center mt-1">
+                Les inscriptions seront annulées et les soldes remboursés automatiquement.
+              </p>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Manage class types modal */}
