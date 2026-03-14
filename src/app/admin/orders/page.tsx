@@ -47,7 +47,7 @@ export default function OrdersPage() {
       supabase.from("products").select("*").eq("active", true).order("name"),
     ]);
 
-    setOrders((ordersRes.data as OrderWithDetails[]) || []);
+    setOrders((ordersRes.data as unknown as OrderWithDetails[]) || []);
     setMembers(membersRes.data || []);
     setProducts(productsRes.data || []);
     setLoading(false);
