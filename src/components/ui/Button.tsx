@@ -20,22 +20,22 @@ export function Button({
   ...props
 }: ButtonProps) {
   const base =
-    "inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0a0a0a] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none";
+    "inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0e0d14] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none";
 
   const variants = {
-    gold: "bg-gradient-to-r from-[#D4AF37] via-[#F5E06B] to-[#D4AF37] text-[#0a0a0a] hover:shadow-[0_4px_20px_rgba(212,175,55,0.4)] hover:-translate-y-0.5 focus:ring-[#D4AF37]",
+    gold: "bg-gradient-to-r from-[#C9A227] via-[#E8C84A] to-[#C9A227] bg-size-200 text-[#0a0a0a] font-bold hover:shadow-[0_4px_24px_rgba(212,175,55,0.5)] hover:-translate-y-0.5 active:translate-y-0 focus:ring-[#D4AF37]",
     outline:
-      "bg-transparent border border-[#D4AF37] text-[#D4AF37] hover:bg-[rgba(212,175,55,0.1)] focus:ring-[#D4AF37]",
+      "bg-transparent border border-[#2d2b40] text-gray-300 hover:border-[#D4AF37]/50 hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 focus:ring-[#D4AF37]/30",
     ghost:
-      "bg-transparent text-white hover:bg-[#1a1a1a] focus:ring-white/20",
+      "bg-transparent text-gray-400 hover:text-white hover:bg-white/5 focus:ring-white/10",
     danger:
-      "bg-red-600 text-white hover:bg-red-700 focus:ring-red-600",
+      "bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-400/50 focus:ring-red-500/30",
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-sm",
+    sm: "px-3 py-1.5 text-xs",
     md: "px-5 py-2.5 text-sm",
-    lg: "px-6 py-3 text-base",
+    lg: "px-6 py-3 text-sm",
   };
 
   return (
@@ -45,24 +45,9 @@ export function Button({
       {...props}
     >
       {loading && (
-        <svg
-          className="animate-spin h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
+        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
       )}
       {children}

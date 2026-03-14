@@ -14,10 +14,10 @@ export function Card({ children, className, hover, gold, onClick }: CardProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-[#111111] border border-[#1f1f1f] rounded-xl",
+        "bg-gradient-to-br from-[#1e1c2d] to-[#191828] border border-[#2d2b40] rounded-2xl",
         hover &&
-          "transition-all duration-200 hover:border-[#D4AF37] hover:shadow-[0_4px_20px_rgba(212,175,55,0.15)] cursor-pointer",
-        gold && "border-[#D4AF37]/30 shadow-[0_0_20px_rgba(212,175,55,0.1)]",
+          "transition-all duration-200 hover:border-[#D4AF37]/40 hover:shadow-[0_8px_30px_rgba(212,175,55,0.12)] hover:-translate-y-0.5 cursor-pointer",
+        gold && "border-[#D4AF37]/30 shadow-[0_0_30px_rgba(212,175,55,0.12)]",
         className
       )}
     >
@@ -26,6 +26,8 @@ export function Card({ children, className, hover, gold, onClick }: CardProps) {
   );
 }
 
+type StatColor = "gold" | "blue" | "green" | "purple" | "gray";
+
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -33,31 +35,64 @@ interface StatCardProps {
   icon: React.ReactNode;
   trend?: string;
   trendUp?: boolean;
+  color?: StatColor;
 }
 
-export function StatCard({ title, value, subtitle, icon, trend, trendUp }: StatCardProps) {
+const statColorMap: Record<StatColor, { icon: string; gradient: string; border: string }> = {
+  gold: {
+    icon: "bg-[#D4AF37]/15 text-[#D4AF37]",
+    gradient: "from-[#D4AF37]/8 to-transparent",
+    border: "border-[#D4AF37]/20",
+  },
+  blue: {
+    icon: "bg-blue-500/15 text-blue-400",
+    gradient: "from-blue-500/8 to-transparent",
+    border: "border-blue-500/20",
+  },
+  green: {
+    icon: "bg-green-500/15 text-green-400",
+    gradient: "from-green-500/8 to-transparent",
+    border: "border-green-500/20",
+  },
+  purple: {
+    icon: "bg-purple-500/15 text-purple-400",
+    gradient: "from-purple-500/8 to-transparent",
+    border: "border-purple-500/20",
+  },
+  gray: {
+    icon: "bg-[#2d2b40] text-gray-400",
+    gradient: "from-white/3 to-transparent",
+    border: "border-[#2d2b40]",
+  },
+};
+
+export function StatCard({ title, value, subtitle, icon, trend, trendUp, color = "gray" }: StatCardProps) {
+  const c = statColorMap[color];
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-400 font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
-          {trend && (
-            <p
-              className={cn(
-                "text-xs font-medium mt-1",
-                trendUp ? "text-green-400" : "text-red-400"
-              )}
-            >
-              {trend}
-            </p>
-          )}
-        </div>
-        <div className="w-10 h-10 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#D4AF37]">
-          {icon}
+    <div className={cn(
+      "relative overflow-hidden rounded-2xl border p-5",
+      "bg-gradient-to-br from-[#1e1c2d] to-[#191828]",
+      c.border
+    )}>
+      {/* Gradient accent */}
+      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-60", c.gradient)} />
+      <div className="relative">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">{title}</p>
+            <p className="text-3xl font-bold text-white mt-1.5 leading-none">{value}</p>
+            {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            {trend && (
+              <p className={cn("text-xs font-medium mt-1.5", trendUp ? "text-green-400" : "text-red-400")}>
+                {trend}
+              </p>
+            )}
+          </div>
+          <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0", c.icon)}>
+            {icon}
+          </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

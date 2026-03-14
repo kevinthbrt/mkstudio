@@ -11,7 +11,7 @@ export function DashboardLayout({ children, profile, title }: DashboardLayoutPro
   const userName = `${profile.first_name} ${profile.last_name}`;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0e0d14]">
       <Sidebar role={profile.role} userName={userName} />
       <MobileHeader title={title} role={profile.role} userName={userName} />
 
