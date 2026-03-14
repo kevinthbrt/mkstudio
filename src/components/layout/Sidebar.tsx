@@ -27,6 +27,7 @@ const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Tableau de bord", icon: <Home size={18} /> },
   { href: "/dashboard/planning", label: "Planning", icon: <Calendar size={18} /> },
   { href: "/dashboard/sessions", label: "Mes séances", icon: <BarChart3 size={18} /> },
+  { href: "/dashboard/purchases", label: "Achats & Factures", icon: <CreditCard size={18} /> },
   { href: "/dashboard/profile", label: "Mon profil", icon: <User size={18} /> },
 ];
 
