@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY ?? "");
+}
 const FROM = process.env.RESEND_FROM_EMAIL ?? "MK Studio <noreply@mkstudio.fr>";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mkstudio.fr";
 
@@ -81,7 +83,7 @@ export async function sendWelcomeEmail(to: string, firstName: string) {
     </div>
   `);
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to,
     subject: "Bienvenue chez MK Studio 🏋️",
@@ -127,7 +129,7 @@ export async function sendBookingConfirmationEmail(params: {
     </div>
   `);
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to,
     subject: `Inscription confirmée — ${sessionName}`,
@@ -169,7 +171,7 @@ export async function sendCancellationEmail(params: {
     </div>
   `);
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to,
     subject: `Annulation — ${sessionName}`,
@@ -217,7 +219,7 @@ export async function sendPurchaseConfirmationEmail(params: {
     </div>
   `);
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to,
     subject: `Confirmation d'achat — ${productName} (${invoiceNumber})`,
@@ -257,7 +259,7 @@ export async function sendSessionReminderEmail(params: {
     </div>
   `);
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM,
     to,
     subject: `Rappel — ${sessionName} demain à ${sessionTime}`,
