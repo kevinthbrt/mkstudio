@@ -57,7 +57,7 @@ export default async function AdminDashboard() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-[#D4AF37]/60 uppercase tracking-widest mb-1">Administration</p>
-            <h1 className="text-2xl font-black text-white tracking-tight">Tableau de bord</h1>
+            <h1 className="text-2xl font-black text-white tracking-tight">Accueil</h1>
             <p className="text-gray-500 text-sm mt-1">Vue d&apos;ensemble de MK Studio</p>
           </div>
           <PushNotificationSetup />

@@ -442,6 +442,12 @@ export default function AdminPlanningPage() {
       <WeeklyCalendar
         key={refreshKey}
         isAdmin
+        adminMembers={members.map((m) => ({
+          id: m.id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          collective_balance: m.collective_balance,
+        }))}
         onRequestEdit={openEditModal}
         onToggleVisibility={handleToggleVisibility}
         onRevealWeek={handleRevealWeek}
