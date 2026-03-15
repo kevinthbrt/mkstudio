@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { WeeklyCalendar, ClassSessionWithType } from "@/components/planning/WeeklyCalendar";
-import { Plus, Palette, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Palette, Trash2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import type { ClassType, Profile } from "@/types/database";
 
 const COLOR_PRESETS = [
@@ -32,8 +32,10 @@ export default function AdminPlanningPage() {
     start_hour: "09:00",
     end_hour: "10:00",
     max_participants: "10",
-    min_cancel_hours: "2",
+    min_cancel_hours: "3",
     recurring: false,
+    infinite_recurrence: false,
+    hide_weeks: true,
     weeks: "4",
   });
 
@@ -46,7 +48,8 @@ export default function AdminPlanningPage() {
     start_hour: "09:00",
     end_hour: "10:00",
     max_participants: "10",
-    min_cancel_hours: "2",
+    min_cancel_hours: "3",
+    is_hidden: false,
   });
 
   const [typeForm, setTypeForm] = useState({
@@ -100,6 +103,7 @@ export default function AdminPlanningPage() {
       end_hour: endHour,
       max_participants: String(session.max_participants),
       min_cancel_hours: String(session.min_cancel_hours),
+      is_hidden: session.is_hidden,
     });
     setShowEditSession(true);
   }
@@ -117,7 +121,11 @@ export default function AdminPlanningPage() {
     const sessions = [];
 
     if (sessionForm.recurring) {
-      const weeks = parseInt(sessionForm.weeks);
+      const isInfinite = sessionForm.infinite_recurrence;
+      const weeks = isInfinite ? 104 : parseInt(sessionForm.weeks);
+      const recurringRule = isInfinite ? "weekly:infinite" : `weekly:${weeks}`;
+      const shouldHide = isInfinite && sessionForm.hide_weeks;
+
       for (let i = 0; i < weeks; i++) {
         const start = new Date(startTime);
         const end = new Date(endTime);
@@ -132,7 +140,8 @@ export default function AdminPlanningPage() {
           end_time: end.toISOString(),
           max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
           min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
-          recurring_rule: `weekly:${weeks}`,
+          recurring_rule: recurringRule,
+          is_hidden: shouldHide,
         });
       }
     } else {
@@ -146,6 +155,7 @@ export default function AdminPlanningPage() {
         max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
         min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
         recurring_rule: null,
+        is_hidden: false,
       });
     }
 
@@ -184,8 +194,10 @@ export default function AdminPlanningPage() {
       start_hour: "09:00",
       end_hour: "10:00",
       max_participants: "10",
-      min_cancel_hours: "2",
+      min_cancel_hours: "3",
       recurring: false,
+      infinite_recurrence: false,
+      hide_weeks: true,
       weeks: "4",
     });
   }
@@ -210,6 +222,7 @@ export default function AdminPlanningPage() {
         max_participants: isIndividual ? 1 : parseInt(editForm.max_participants),
         min_cancel_hours: parseInt(editForm.min_cancel_hours),
         assigned_member_id: isIndividual ? editForm.assigned_member_id || null : null,
+        is_hidden: editForm.is_hidden,
       })
       .eq("id", editingSession.id);
 
@@ -328,6 +341,24 @@ export default function AdminPlanningPage() {
     loadClassTypes();
   }
 
+  async function handleToggleVisibility(session: ClassSessionWithType) {
+    const supabase = createClient();
+    await supabase
+      .from("class_sessions")
+      .update({ is_hidden: !session.is_hidden })
+      .eq("id", session.id);
+    setRefreshKey((k) => k + 1);
+  }
+
+  async function handleRevealWeek(sessionIds: string[]) {
+    const supabase = createClient();
+    await supabase
+      .from("class_sessions")
+      .update({ is_hidden: false })
+      .in("id", sessionIds);
+    setRefreshKey((k) => k + 1);
+  }
+
   const isIndividual = sessionForm.session_type === "individual";
   const editIsIndividual = editForm.session_type === "individual";
 
@@ -356,6 +387,8 @@ export default function AdminPlanningPage() {
         key={refreshKey}
         isAdmin
         onRequestEdit={openEditModal}
+        onToggleVisibility={handleToggleVisibility}
+        onRevealWeek={handleRevealWeek}
       />
 
       {/* Create session modal */}
@@ -505,7 +538,7 @@ export default function AdminPlanningPage() {
               type="checkbox"
               checked={sessionForm.recurring}
               onChange={(e) =>
-                setSessionForm({ ...sessionForm, recurring: e.target.checked })
+                setSessionForm({ ...sessionForm, recurring: e.target.checked, infinite_recurrence: false })
               }
               className="w-4 h-4 accent-[#D4AF37]"
             />
@@ -515,23 +548,85 @@ export default function AdminPlanningPage() {
           </label>
 
           {sessionForm.recurring && (
-            <Input
-              label="Nombre de semaines"
-              type="number"
-              min="1"
-              max="52"
-              value={sessionForm.weeks}
-              onChange={(e) =>
-                setSessionForm({ ...sessionForm, weeks: e.target.value })
-              }
-            />
+            <div className="space-y-3 pl-4 border-l-2 border-[#D4AF37]/20">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSessionForm({ ...sessionForm, infinite_recurrence: false })}
+                  className={`flex-1 p-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                    !sessionForm.infinite_recurrence
+                      ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
+                      : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                  }`}
+                >
+                  Nombre fixe
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionForm({ ...sessionForm, infinite_recurrence: true, hide_weeks: true })}
+                  className={`flex-1 p-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                    sessionForm.infinite_recurrence
+                      ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
+                      : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                  }`}
+                >
+                  Récurrence infinie
+                </button>
+              </div>
+
+              {!sessionForm.infinite_recurrence && (
+                <Input
+                  label="Nombre de semaines"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value={sessionForm.weeks}
+                  onChange={(e) =>
+                    setSessionForm({ ...sessionForm, weeks: e.target.value })
+                  }
+                />
+              )}
+
+              {sessionForm.infinite_recurrence && (
+                <div className="space-y-2">
+                  <div className="bg-[#1a1a1a] rounded-lg p-3">
+                    <p className="text-xs text-gray-400">
+                      104 séances seront générées (2 ans), puis renouvelables.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sessionForm.hide_weeks}
+                      onChange={(e) =>
+                        setSessionForm({ ...sessionForm, hide_weeks: e.target.checked })
+                      }
+                      className="w-4 h-4 accent-[#D4AF37]"
+                    />
+                    <span className="text-sm text-gray-300 flex items-center gap-1.5">
+                      <EyeOff size={14} className="text-gray-500" />
+                      Masquer les semaines (débloquer manuellement)
+                    </span>
+                  </label>
+                  {sessionForm.hide_weeks && (
+                    <p className="text-xs text-gray-500 pl-6">
+                      Les membres ne verront les séances que lorsque vous les débloquez depuis le calendrier.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {isIndividual && (
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
               <p className="text-xs text-blue-400">
                 ✓ L&apos;adhérent sera automatiquement inscrit et son solde individuel débité
-                {sessionForm.recurring ? ` pour ${sessionForm.weeks} séances` : ""}.
+                {sessionForm.recurring
+                  ? sessionForm.infinite_recurrence
+                    ? " pour 104 séances (récurrence infinie)"
+                    : ` pour ${sessionForm.weeks} séances`
+                  : ""}.
               </p>
             </div>
           )}
@@ -547,7 +642,9 @@ export default function AdminPlanningPage() {
             </Button>
             <Button type="submit" loading={savingSession} className="flex-1">
               {sessionForm.recurring
-                ? `Créer ${sessionForm.weeks} cours`
+                ? sessionForm.infinite_recurrence
+                  ? "Créer la récurrence infinie"
+                  : `Créer ${sessionForm.weeks} cours`
                 : "Créer le cours"}
             </Button>
           </div>
@@ -669,6 +766,27 @@ export default function AdminPlanningPage() {
                   setEditForm({ ...editForm, min_cancel_hours: e.target.value })
                 }
               />
+            )}
+
+            {!editIsIndividual && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_hidden}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, is_hidden: e.target.checked })
+                  }
+                  className="w-4 h-4 accent-[#D4AF37]"
+                />
+                <span className="text-sm text-gray-300 flex items-center gap-1.5">
+                  {editForm.is_hidden ? (
+                    <EyeOff size={14} className="text-gray-500" />
+                  ) : (
+                    <Eye size={14} className="text-green-400" />
+                  )}
+                  {editForm.is_hidden ? "Masqué aux membres" : "Visible aux membres"}
+                </span>
+              </label>
             )}
 
             <div className="flex gap-3 pt-2">

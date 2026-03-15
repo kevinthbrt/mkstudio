@@ -14,6 +14,8 @@ import {
   Zap,
   AlertTriangle,
   Pencil,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import {
   getWeekDays,
@@ -32,6 +34,7 @@ export interface ClassSessionWithType {
   current_participants: number;
   min_cancel_hours: number;
   is_cancelled: boolean;
+  is_hidden: boolean;
   session_type: "collective" | "individual";
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
@@ -48,6 +51,9 @@ interface CalendarProps {
   individualBalance?: number;
   isAdmin?: boolean;
   onRequestEdit?: (session: ClassSessionWithType) => void;
+  onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
+  onRevealWeek?: (sessionIds: string[]) => Promise<void>;
+  onBalanceChange?: (collective: number, individual: number) => void;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -59,14 +65,26 @@ export function WeeklyCalendar({
   individualBalance = 0,
   isAdmin = false,
   onRequestEdit,
+  onToggleVisibility,
+  onRevealWeek,
+  onBalanceChange,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
   const [bookings, setBookings] = useState<Record<string, string>>({});
+  const [bookingGuests, setBookingGuests] = useState<Record<string, string | null>>({});
+  const [localCollectiveBalance, setLocalCollectiveBalance] = useState(collectiveBalance);
+  const [localIndividualBalance, setLocalIndividualBalance] = useState(individualBalance);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ClassSessionWithType | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [revealingWeek, setRevealingWeek] = useState(false);
+  const [inviteFriends, setInviteFriends] = useState(false);
+  const [friendNames, setFriendNames] = useState("");
+  const [sessionBookees, setSessionBookees] = useState<{ name: string; guest_names: string | null }[]>([]);
+  const [loadingBookees, setLoadingBookees] = useState(false);
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -130,17 +148,51 @@ export function WeeklyCalendar({
     if (memberId) {
       const { data: bookingsData } = await supabase
         .from("class_bookings")
-        .select("class_session_id, status")
+        .select("class_session_id, status, guest_names")
         .eq("member_id", memberId);
 
       const bookingMap: Record<string, string> = {};
-      (bookingsData || []).forEach((b) => {
+      const guestMap: Record<string, string | null> = {};
+      (bookingsData || []).forEach((b: any) => {
         bookingMap[b.class_session_id] = b.status;
+        guestMap[b.class_session_id] = b.guest_names ?? null;
       });
       setBookings(bookingMap);
+      setBookingGuests(guestMap);
     }
 
     setLoading(false);
+  }
+
+  async function loadSessionBookees(sessionId: string) {
+    setLoadingBookees(true);
+    if (isAdmin) {
+      // Use server-side API route (service role) to avoid RLS recursion
+      const res = await fetch(`/api/admin/sessions/bookees?session_id=${sessionId}`);
+      const data = await res.json();
+      setSessionBookees(Array.isArray(data) ? data : []);
+    } else {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("class_bookings")
+        .select("guest_names, profiles (first_name, last_name)")
+        .eq("class_session_id", sessionId)
+        .eq("status", "confirmed");
+      setSessionBookees(
+        ((data as any[]) || []).map((b) => ({
+          name: `${b.profiles?.first_name ?? ""} ${b.profiles?.last_name ?? ""}`.trim(),
+          guest_names: b.guest_names,
+        }))
+      );
+    }
+    setLoadingBookees(false);
+  }
+
+  function parseFriends(raw: string): string[] {
+    return raw
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   async function handleBook(session: ClassSessionWithType) {
@@ -168,13 +220,18 @@ export function WeeklyCalendar({
 
       const { data: existingBooking } = await supabase
         .from("class_bookings")
-        .select("id, session_debited")
+        .select("id, session_debited, guest_names")
         .eq("member_id", memberId)
         .eq("class_session_id", session.id)
         .eq("status", "confirmed")
         .single();
 
       if (existingBooking) {
+        const guests = existingBooking.guest_names
+          ? existingBooking.guest_names.split(",").map((s: string) => s.trim()).filter(Boolean)
+          : [];
+        const totalRefund = 1 + guests.length;
+
         await supabase
           .from("class_bookings")
           .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
@@ -182,38 +239,50 @@ export function WeeklyCalendar({
 
         if (existingBooking.session_debited) {
           if (session.session_type === "individual") {
-            await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
+            for (let i = 0; i < totalRefund; i++) {
+              await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
+            }
+            setLocalIndividualBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(localCollectiveBalance, next); return next; });
           } else {
-            await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
+            for (let i = 0; i < totalRefund; i++) {
+              await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
+            }
+            setLocalCollectiveBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(next, localIndividualBalance); return next; });
           }
         }
 
-        await supabase.rpc("decrement_participants", { session_id: session.id });
+        for (let i = 0; i < totalRefund; i++) {
+          await supabase.rpc("decrement_participants", { session_id: session.id });
+        }
       }
 
       setBookings((b) => ({ ...b, [session.id]: "cancelled" }));
+      setBookingGuests((g) => ({ ...g, [session.id]: null }));
       setSessions((s) =>
         s.map((sess) =>
           sess.id === session.id
-            ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) }
+            ? { ...sess, current_participants: Math.max(0, sess.current_participants - (existingBooking ? 1 + (existingBooking.guest_names ? existingBooking.guest_names.split(",").filter(Boolean).length : 0) : 1)) }
             : sess
         )
       );
     } else {
-      const balance = session.session_type === "individual" ? individualBalance : collectiveBalance;
+      const guests = inviteFriends ? parseFriends(friendNames) : [];
+      const totalSpots = 1 + guests.length;
+      const balance = session.session_type === "individual" ? localIndividualBalance : localCollectiveBalance;
 
-      if (balance <= 0 && !isAdmin) {
+      if (balance < totalSpots && !isAdmin) {
         setBookingError(
           session.session_type === "individual"
             ? "Solde individuel insuffisant."
-            : "Solde collectif insuffisant. Contactez votre coach pour acheter un pack."
+            : `Solde collectif insuffisant (${balance} séance(s) disponible(s), ${totalSpots} nécessaire(s)).`
         );
         setBooking(false);
         return;
       }
 
-      if (session.current_participants >= session.max_participants) {
-        setBookingError("Ce cours est complet.");
+      const spotsLeft = session.max_participants - session.current_participants;
+      if (spotsLeft < totalSpots) {
+        setBookingError(`Plus assez de places (${spotsLeft} disponible(s) pour ${totalSpots} personne(s)).`);
         setBooking(false);
         return;
       }
@@ -226,6 +295,7 @@ export function WeeklyCalendar({
           class_session_id: session.id,
           status: "confirmed",
           session_debited: true,
+          ...(guests.length > 0 ? { guest_names: guests.join(", ") } : {}),
           booked_at: new Date().toISOString(),
           cancelled_at: null,
         },
@@ -239,18 +309,27 @@ export function WeeklyCalendar({
       }
 
       if (session.session_type === "individual") {
-        await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
+        for (let i = 0; i < totalSpots; i++) {
+          await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
+        }
+        setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next); return next; });
       } else {
-        await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
+        for (let i = 0; i < totalSpots; i++) {
+          await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
+        }
+        setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance); return next; });
       }
 
-      await supabase.rpc("increment_participants", { session_id: session.id });
+      for (let i = 0; i < totalSpots; i++) {
+        await supabase.rpc("increment_participants", { session_id: session.id });
+      }
 
       setBookings((b) => ({ ...b, [session.id]: "confirmed" }));
+      setBookingGuests((g) => ({ ...g, [session.id]: guests.length > 0 ? guests.join(", ") : null }));
       setSessions((s) =>
         s.map((sess) =>
           sess.id === session.id
-            ? { ...sess, current_participants: sess.current_participants + 1 }
+            ? { ...sess, current_participants: sess.current_participants + totalSpots }
             : sess
         )
       );
@@ -273,11 +352,16 @@ export function WeeklyCalendar({
 
   const today = new Date();
 
+  function isPast(session: ClassSessionWithType) {
+    return new Date(session.start_time) < today;
+  }
+
   function getSessionBadge(session: ClassSessionWithType) {
     const isBooked = bookings[session.id] === "confirmed";
     const isFull = session.current_participants >= session.max_participants;
     const isIndividual = session.session_type === "individual";
 
+    if (isPast(session)) return <Badge variant="gray">Terminé</Badge>;
     if (isBooked) return <Badge variant="green">Inscrit</Badge>;
     if (isIndividual) return <Badge variant="blue">Individuel</Badge>;
     if (isFull) return <Badge variant="red">Complet</Badge>;
@@ -295,15 +379,43 @@ export function WeeklyCalendar({
   return (
     <div className="space-y-4">
       {/* Week navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={prevWeek}>
           <ChevronLeft size={16} />
         </Button>
-        <div className="text-center">
+        <div className="flex-1 flex flex-col items-center gap-1.5">
           <p className="text-white font-medium text-sm">
             {formatDate(weekDays[0].toISOString())} —{" "}
             {formatDate(weekDays[6].toISOString())}
           </p>
+          {isAdmin && onRevealWeek && (() => {
+            const hiddenIds = sessions
+              .filter((s) => s.is_hidden && s.session_type === "collective")
+              .map((s) => s.id);
+            if (hiddenIds.length === 0) return null;
+            return (
+              <button
+                type="button"
+                disabled={revealingWeek}
+                onClick={async () => {
+                  setRevealingWeek(true);
+                  await onRevealWeek(hiddenIds);
+                  setSessions((s) =>
+                    s.map((sess) =>
+                      hiddenIds.includes(sess.id) ? { ...sess, is_hidden: false } : sess
+                    )
+                  );
+                  setRevealingWeek(false);
+                }}
+                className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-50"
+              >
+                <Eye size={11} />
+                {revealingWeek
+                  ? "Déblocage..."
+                  : `Rendre visible toute la semaine (${hiddenIds.length})`}
+              </button>
+            );
+          })()}
         </div>
         <Button variant="ghost" size="sm" onClick={nextWeek}>
           <ChevronRight size={16} />
@@ -340,12 +452,18 @@ export function WeeklyCalendar({
                 const isBooked = bookings[session.id] === "confirmed";
                 const isFull = session.current_participants >= session.max_participants;
                 const isIndividual = session.session_type === "individual";
+                const isHidden = session.is_hidden;
+                const past = isPast(session);
 
                 return (
                   <div
                     key={session.id}
                     className={`border rounded-xl p-3 mb-2 cursor-pointer transition-colors ${
-                      isBooked
+                      past
+                        ? "bg-[#0d0d0d] border-[#1a1a1a] opacity-50 grayscale"
+                        : isHidden && isAdmin
+                        ? "bg-[#111111] border-[#2a2a2a] border-dashed opacity-60"
+                        : isBooked
                         ? "bg-[#D4AF37]/10 border-[#D4AF37]/30"
                         : isIndividual
                         ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
@@ -354,6 +472,10 @@ export function WeeklyCalendar({
                     onClick={() => {
                       setSelectedSession(session);
                       setBookingError("");
+                      setSessionBookees([]);
+                      if (isAdmin && session.session_type === "collective") {
+                        loadSessionBookees(session.id);
+                      }
                     }}
                   >
                     <div className="flex items-start gap-2">
@@ -366,15 +488,20 @@ export function WeeklyCalendar({
                           <p className="text-white text-sm font-medium truncate">
                             {session.class_types.name}
                           </p>
-                          {getSessionBadge(session)}
+                          <div className="flex items-center gap-1">
+                            {isHidden && isAdmin && (
+                              <EyeOff size={12} className="text-gray-500" />
+                            )}
+                            {getSessionBadge(session)}
+                          </div>
                         </div>
                         <p className="text-gray-500 text-xs mt-0.5">
                           {formatTime(session.start_time)} — {formatTime(session.end_time)} •{" "}
                           {session.coach_name}
                         </p>
                         {!isIndividual && (
-                          <p className="text-gray-600 text-xs mt-0.5">
-                            {session.current_participants}/{session.max_participants} places
+                          <p className={`text-xs mt-0.5 ${isFull ? "text-red-400" : isAdmin ? "text-gray-400 font-medium" : "text-gray-600"}`}>
+                            {session.current_participants}/{session.max_participants} inscrits
                             {isFull && " · Complet"}
                           </p>
                         )}
@@ -419,18 +546,28 @@ export function WeeklyCalendar({
                   {daySessions.map((session) => {
                     const isBooked = bookings[session.id] === "confirmed";
                     const isIndividual = session.session_type === "individual";
+                    const isHidden = session.is_hidden;
+                    const past = isPast(session);
 
                     return (
                       <div
                         key={session.id}
-                        className={`rounded-lg p-2 cursor-pointer hover:opacity-90 transition-opacity ${
-                          isBooked ? "ring-1 ring-[#D4AF37]/50" : ""
+                        className={`rounded-lg p-2 cursor-pointer transition-opacity ${
+                          past
+                            ? "opacity-40 grayscale"
+                            : isHidden && isAdmin
+                            ? "opacity-50 border-dashed hover:opacity-60"
+                            : isBooked
+                            ? "ring-1 ring-[#D4AF37]/50 hover:opacity-90"
+                            : "hover:opacity-90"
                         } ${isIndividual ? "border border-blue-500/30" : "border border-white/5"}`}
                         style={{
-                          backgroundColor: isBooked
+                          backgroundColor: past
+                            ? "#111"
+                            : isBooked
                             ? session.class_types.color + "30"
                             : session.class_types.color + "20",
-                          borderLeftColor: session.class_types.color,
+                          borderLeftColor: past ? "#333" : session.class_types.color,
                           borderLeftWidth: "3px",
                         }}
                         onClick={() => {
@@ -438,12 +575,17 @@ export function WeeklyCalendar({
                           setBookingError("");
                         }}
                       >
-                        <p
-                          className="text-xs font-semibold truncate"
-                          style={{ color: session.class_types.color }}
-                        >
-                          {session.class_types.name}
-                        </p>
+                        <div className="flex items-center gap-1">
+                          <p
+                            className="text-xs font-semibold truncate flex-1"
+                            style={{ color: session.class_types.color }}
+                          >
+                            {session.class_types.name}
+                          </p>
+                          {isHidden && isAdmin && (
+                            <EyeOff size={10} className="text-gray-500 flex-shrink-0" />
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 mt-0.5">
                           {formatTime(session.start_time)}
                         </p>
@@ -454,7 +596,12 @@ export function WeeklyCalendar({
                               : "Individuel"}
                           </p>
                         )}
-                        {isBooked && (
+                        {isAdmin && !isIndividual && (
+                          <p className={`text-xs mt-0.5 font-medium ${session.current_participants >= session.max_participants ? "text-red-400" : "text-gray-400"}`}>
+                            {session.current_participants}/{session.max_participants}
+                          </p>
+                        )}
+                        {!isAdmin && isBooked && (
                           <div className="mt-1">
                             <Badge variant="green">✓</Badge>
                           </div>
@@ -476,6 +623,8 @@ export function WeeklyCalendar({
           onClose={() => {
             setSelectedSession(null);
             setBookingError("");
+            setInviteFriends(false);
+            setFriendNames("");
           }}
           title={selectedSession.class_types.name}
         >
@@ -549,41 +698,90 @@ export function WeeklyCalendar({
               </div>
             )}
 
-            {memberId && !isAdmin && selectedSession.session_type === "collective" && (
+            {memberId && !isAdmin && isPast(selectedSession) && (
+              <div className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-3 text-center">
+                <p className="text-sm text-gray-500">Ce cours est terminé</p>
+              </div>
+            )}
+
+            {memberId && !isAdmin && !isPast(selectedSession) && selectedSession.session_type === "collective" && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-3">
                   <Zap size={14} className="text-[#D4AF37]" />
                   <p className="text-xs text-gray-400">
                     Solde collectif :{" "}
                     <span className="text-[#D4AF37] font-semibold">
-                      {collectiveBalance} séance(s)
+                      {localCollectiveBalance} séance(s)
                     </span>
                   </p>
                 </div>
 
                 {bookings[selectedSession.id] === "confirmed" ? (
-                  <Button
-                    variant="outline"
-                    className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    onClick={() => handleBook(selectedSession)}
-                    loading={booking}
-                  >
-                    Se désinscrire
-                  </Button>
+                  <div className="space-y-2">
+                    {bookingGuests[selectedSession.id] && (
+                      <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 text-xs text-gray-400 border border-[#2a2a2a]">
+                        Inscrit(e) avec : <span className="text-white">{bookingGuests[selectedSession.id]}</span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
+                      onClick={() => handleBook(selectedSession)}
+                      loading={booking}
+                    >
+                      Se désinscrire
+                      {bookingGuests[selectedSession.id]
+                        ? ` (${1 + bookingGuests[selectedSession.id]!.split(",").filter(Boolean).length} séances remboursées)`
+                        : " (1 séance remboursée)"}
+                    </Button>
+                  </div>
                 ) : (
-                  <Button
-                    className="w-full"
-                    onClick={() => handleBook(selectedSession)}
-                    loading={booking}
-                    disabled={
-                      selectedSession.current_participants >= selectedSession.max_participants ||
-                      collectiveBalance <= 0
-                    }
-                  >
-                    {selectedSession.current_participants >= selectedSession.max_participants
-                      ? "Cours complet"
-                      : "S'inscrire (1 séance collective)"}
-                  </Button>
+                  <>
+                    {/* Invite friends */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2 border border-[#2a2a2a]">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inviteFriends}
+                          onChange={(e) => { setInviteFriends(e.target.checked); if (!e.target.checked) setFriendNames(""); }}
+                          className="accent-[#D4AF37] w-4 h-4"
+                        />
+                        <span className="text-sm text-gray-300">Inviter des ami(e)s</span>
+                      </label>
+                      {inviteFriends && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-gray-500">Entrez les prénoms, séparés par une virgule ou un saut de ligne</p>
+                          <textarea
+                            value={friendNames}
+                            onChange={(e) => setFriendNames(e.target.value)}
+                            placeholder="Alice, Bob..."
+                            rows={2}
+                            className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#D4AF37] resize-none"
+                          />
+                          {parseFriends(friendNames).length > 0 && (
+                            <p className="text-xs text-[#D4AF37]">
+                              {1 + parseFriends(friendNames).length} place(s) à débiter
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => handleBook(selectedSession)}
+                      loading={booking}
+                      disabled={
+                        selectedSession.current_participants >= selectedSession.max_participants ||
+                        localCollectiveBalance <= 0
+                      }
+                    >
+                      {selectedSession.current_participants >= selectedSession.max_participants
+                        ? "Cours complet"
+                        : inviteFriends && parseFriends(friendNames).length > 0
+                        ? `S'inscrire avec ${parseFriends(friendNames).length} ami(e)(s) (${1 + parseFriends(friendNames).length} séances)`
+                        : "S'inscrire (1 séance collective)"}
+                    </Button>
+                  </>
                 )}
               </div>
             )}
@@ -609,16 +807,83 @@ export function WeeklyCalendar({
             {/* Admin view */}
             {isAdmin && (
               <div className="space-y-2">
-                <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
-                  <Users size={14} className="text-gray-400" />
-                  <p className="text-xs text-gray-400">
-                    {selectedSession.session_type === "collective"
-                      ? `${selectedSession.current_participants}/${selectedSession.max_participants} inscrits`
-                      : selectedSession.assigned_member_name
-                      ? `Adhérent : ${selectedSession.assigned_member_name}`
-                      : "Cours individuel — aucun adhérent assigné"}
-                  </p>
-                </div>
+                {selectedSession.session_type === "collective" ? (
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Users size={14} className="text-gray-400" />
+                      <p className="text-xs text-gray-400 font-medium">
+                        {selectedSession.current_participants}/{selectedSession.max_participants} inscrits
+                      </p>
+                    </div>
+                    {loadingBookees ? (
+                      <p className="text-xs text-gray-600">Chargement...</p>
+                    ) : sessionBookees.length > 0 ? (
+                      <ul className="space-y-1">
+                        {sessionBookees.map((b, i) => (
+                          <li key={i} className="text-xs text-white flex flex-col">
+                            <span>• {b.name}</span>
+                            {b.guest_names && (
+                              <span className="text-gray-500 pl-3">
+                                + {b.guest_names}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-600 italic">Aucun inscrit</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
+                    <Users size={14} className="text-gray-400" />
+                    <p className="text-xs text-gray-400">
+                      {selectedSession.assigned_member_name
+                        ? `Adhérent : ${selectedSession.assigned_member_name}`
+                        : "Cours individuel — aucun adhérent assigné"}
+                    </p>
+                  </div>
+                )}
+
+                {onToggleVisibility && selectedSession.session_type === "collective" && (
+                  <Button
+                    variant="outline"
+                    className={`w-full ${
+                      selectedSession.is_hidden
+                        ? "text-green-400 border-green-400/30 hover:bg-green-400/10"
+                        : "text-gray-400 border-gray-400/30 hover:bg-gray-400/10"
+                    }`}
+                    loading={togglingVisibility}
+                    onClick={async () => {
+                      setTogglingVisibility(true);
+                      await onToggleVisibility(selectedSession);
+                      setSessions((s) =>
+                        s.map((sess) =>
+                          sess.id === selectedSession.id
+                            ? { ...sess, is_hidden: !sess.is_hidden }
+                            : sess
+                        )
+                      );
+                      setSelectedSession((prev) =>
+                        prev ? { ...prev, is_hidden: !prev.is_hidden } : null
+                      );
+                      setTogglingVisibility(false);
+                    }}
+                  >
+                    {selectedSession.is_hidden ? (
+                      <>
+                        <Eye size={14} />
+                        Rendre visible aux membres
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff size={14} />
+                        Masquer aux membres
+                      </>
+                    )}
+                  </Button>
+                )}
+
                 {onRequestEdit && (
                   <Button
                     variant="outline"

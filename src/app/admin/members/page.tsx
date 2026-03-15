@@ -78,6 +78,11 @@ export default function MembersPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"info" | "history">("info");
 
+  // Legal status editing
+  const [editingLegalStatus, setEditingLegalStatus] = useState(false);
+  const [legalStatusValue, setLegalStatusValue] = useState("");
+  const [savingLegalStatus, setSavingLegalStatus] = useState(false);
+
   const [newMember, setNewMember] = useState({
     first_name: "",
     last_name: "",
@@ -223,6 +228,23 @@ export default function MembersPage() {
     setAdjustDelta(1);
     setActiveTab("info");
     setMemberHistory([]);
+    setEditingLegalStatus(false);
+    setLegalStatusValue(member.legal_status || "");
+  }
+
+  async function handleSaveLegalStatus() {
+    if (!selectedMember) return;
+    setSavingLegalStatus(true);
+    const supabase = createClient();
+    await supabase
+      .from("profiles")
+      .update({ legal_status: legalStatusValue || null })
+      .eq("id", selectedMember.id);
+    const updated = { ...selectedMember, legal_status: legalStatusValue || null };
+    setMembers((m) => m.map((mb) => (mb.id === selectedMember.id ? updated : mb)));
+    setSelectedMember(updated);
+    setEditingLegalStatus(false);
+    setSavingLegalStatus(false);
   }
 
   function handleTabChange(tab: "info" | "history") {
@@ -470,6 +492,39 @@ export default function MembersPage() {
                     </p>
                     <p className="text-gray-600 text-xs mt-1">séances</p>
                   </div>
+                </div>
+
+                {/* Legal status */}
+                <div className="bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs text-gray-500 font-medium">Statut juridique</p>
+                    {!editingLegalStatus && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingLegalStatus(true); setLegalStatusValue(selectedMember.legal_status || ""); }}
+                        className="text-xs text-[#D4AF37] hover:text-[#B8941E]"
+                      >
+                        Modifier
+                      </button>
+                    )}
+                  </div>
+                  {editingLegalStatus ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={legalStatusValue}
+                        onChange={(e) => setLegalStatusValue(e.target.value)}
+                        placeholder="Ex: Particulier, Auto-entrepreneur..."
+                        className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#D4AF37]"
+                      />
+                      <Button size="sm" loading={savingLegalStatus} onClick={handleSaveLegalStatus}>OK</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingLegalStatus(false)}>✕</Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white">
+                      {selectedMember.legal_status || <span className="text-gray-600 italic">Non renseigné</span>}
+                    </p>
+                  )}
                 </div>
 
                 {/* Action buttons */}

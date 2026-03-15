@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { CheckCircle, Settings, FileText, Info } from "lucide-react";
+import { CheckCircle, Settings, FileText, Info, Upload, X } from "lucide-react";
 import type { InvoiceSettings } from "@/types/database";
 
 export default function SettingsPage() {
@@ -13,6 +13,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
+  const [uploadingStamp, setUploadingStamp] = useState(false);
 
   const [form, setForm] = useState({
     business_name: "",
@@ -40,6 +42,7 @@ export default function SettingsPage() {
     const { data } = await supabase.from("invoice_settings").select("*").single();
     if (data) {
       setSettings(data);
+      setStampUrl(data.stamp_url || null);
       setForm({
         business_name: data.business_name,
         owner_name: data.owner_name,
@@ -60,6 +63,21 @@ export default function SettingsPage() {
     setLoading(false);
   }
 
+  async function handleStampUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingStamp(true);
+    const supabase = createClient();
+    const ext = file.name.split(".").pop();
+    const path = `stamps/stamp-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("invoices").upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from("invoices").getPublicUrl(path);
+      setStampUrl(publicUrl);
+    }
+    setUploadingStamp(false);
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -69,6 +87,7 @@ export default function SettingsPage() {
       ...form,
       ape_code: form.ape_code || null,
       bank_details: form.bank_details || null,
+      stamp_url: stampUrl || null,
     };
 
     if (settings) {
@@ -259,6 +278,38 @@ export default function SettingsPage() {
             placeholder="IBAN: FR76... / BIC: ..."
             rows={3}
           />
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-300">
+              Tampon / Signature (pied de facture)
+            </label>
+            {stampUrl ? (
+              <div className="relative inline-block">
+                <img src={stampUrl} alt="Tampon" className="max-h-24 rounded-lg border border-[#2a2a2a]" />
+                <button
+                  type="button"
+                  onClick={() => setStampUrl(null)}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                >
+                  <X size={11} className="text-white" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 w-fit cursor-pointer bg-[#1a1a1a] border border-dashed border-[#3a3a3a] hover:border-[#D4AF37]/40 rounded-lg px-4 py-3 transition-colors">
+                <Upload size={16} className="text-gray-400" />
+                <span className="text-sm text-gray-400">
+                  {uploadingStamp ? "Envoi en cours..." : "Charger un tampon (PNG, JPG)"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleStampUpload}
+                  disabled={uploadingStamp}
+                />
+              </label>
+            )}
+          </div>
         </Card>
 
         {/* Legal info box */}

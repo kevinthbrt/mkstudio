@@ -34,6 +34,7 @@ export function formatDateTime(dateString: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Paris",
   }).format(new Date(dateString));
 }
 
@@ -41,6 +42,7 @@ export function formatTime(dateString: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Paris",
   }).format(new Date(dateString));
 }
 
