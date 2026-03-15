@@ -2,9 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  // Let CORS preflight requests pass through
+  // Return proper CORS response for preflight requests
   if (request.method === "OPTIONS") {
-    return NextResponse.next({ request });
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": request.headers.get("origin") || "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
