@@ -20,19 +20,20 @@ import { createClient } from "@/lib/supabase/client";
 interface NavItem {
   href: string;
   label: string;
+  shortLabel?: string;
   icon: React.ReactNode;
 }
 
 const memberNav: NavItem[] = [
-  { href: "/dashboard", label: "Tableau de bord", icon: <Home size={18} /> },
+  { href: "/dashboard", label: "Accueil", icon: <Home size={18} /> },
   { href: "/dashboard/planning", label: "Planning", icon: <Calendar size={18} /> },
-  { href: "/dashboard/sessions", label: "Mes séances", icon: <BarChart3 size={18} /> },
-  { href: "/dashboard/purchases", label: "Achats & Factures", icon: <CreditCard size={18} /> },
-  { href: "/dashboard/profile", label: "Mon profil", icon: <User size={18} /> },
+  { href: "/dashboard/sessions", label: "Mes séances", shortLabel: "Séances", icon: <BarChart3 size={18} /> },
+  { href: "/dashboard/purchases", label: "Achats & Factures", shortLabel: "Achats", icon: <CreditCard size={18} /> },
+  { href: "/dashboard/profile", label: "Mon profil", shortLabel: "Profil", icon: <User size={18} /> },
 ];
 
 const adminNav: NavItem[] = [
-  { href: "/admin", label: "Tableau de bord", icon: <Home size={18} /> },
+  { href: "/admin", label: "Accueil", icon: <Home size={18} /> },
   { href: "/admin/planning", label: "Planning", icon: <Calendar size={18} /> },
   { href: "/admin/members", label: "Adhérents", icon: <Users size={18} /> },
   { href: "/admin/products", label: "Produits", icon: <Package size={18} /> },
@@ -132,8 +133,101 @@ export function Sidebar({ role, userName }: SidebarProps) {
 // Mobile bottom navigation
 export function BottomNav({ role }: { role: "admin" | "member" }) {
   const pathname = usePathname();
-  const nav = role === "admin" ? adminNav : memberNav.slice(0, 5);
 
+  if (role === "member") {
+    // Member nav: 4 items + central Réserver button
+    const sideItems = [
+      memberNav[0], // Accueil
+      memberNav[2], // Séances
+      memberNav[3], // Achats
+      memberNav[4], // Profil
+    ];
+
+    return (
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 safe-bottom"
+        style={{ background: "linear-gradient(0deg, #0b0a12 0%, rgba(11,10,18,0.98) 100%)" }}
+      >
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
+        <div className="flex items-center px-1">
+          {/* First 2 items */}
+          {sideItems.slice(0, 2).map((item) => {
+            const isActive = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                  isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                )}
+              >
+                <span className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                  isActive
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                    : "text-gray-600"
+                )}>
+                  {item.icon}
+                </span>
+                <span className="leading-none">{item.shortLabel ?? item.label}</span>
+              </Link>
+            );
+          })}
+
+          {/* Central Réserver button */}
+          <div className="flex-1 flex flex-col items-center justify-center py-1">
+            <Link
+              href="/dashboard/planning"
+              className={cn(
+                "flex flex-col items-center gap-1 transition-all duration-150",
+                pathname.startsWith("/dashboard/planning") ? "opacity-100" : "opacity-90 hover:opacity-100"
+              )}
+            >
+              <span
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(212,175,55,0.45)] -mt-4"
+                style={{
+                  background: pathname.startsWith("/dashboard/planning")
+                    ? "linear-gradient(135deg, #E8C84A 0%, #B8941E 100%)"
+                    : "linear-gradient(135deg, #D4AF37 0%, #A8861A 100%)",
+                }}
+              >
+                <Calendar size={22} className="text-black" />
+              </span>
+              <span className="text-[10px] font-bold text-[#D4AF37] leading-none mt-0.5">Réserver</span>
+            </Link>
+          </div>
+
+          {/* Last 2 items */}
+          {sideItems.slice(2).map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                  isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                )}
+              >
+                <span className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                  isActive
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                    : "text-gray-600"
+                )}>
+                  {item.icon}
+                </span>
+                <span className="leading-none">{item.shortLabel ?? item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
+
+  // Admin nav
+  const nav = adminNav;
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 safe-bottom"
       style={{ background: "linear-gradient(0deg, #0b0a12 0%, rgba(11,10,18,0.98) 100%)" }}
@@ -142,7 +236,7 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
       <div className="flex items-center px-1">
         {nav.map((item) => {
           const isActive =
-            item.href === "/admin" || item.href === "/dashboard"
+            item.href === "/admin"
               ? pathname === item.href
               : pathname.startsWith(item.href);
 
@@ -163,7 +257,7 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
               )}>
                 {item.icon}
               </span>
-              <span className="leading-none truncate">{item.label.split(" ")[0]}</span>
+              <span className="leading-none truncate">{item.shortLabel ?? item.label.split(" ")[0]}</span>
             </Link>
           );
         })}

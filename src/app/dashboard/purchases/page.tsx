@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { formatDate, formatPriceFromEuros } from "@/lib/utils";
+import type { Profile } from "@/types/database";
 
 interface OrderWithProduct {
   id: string;
@@ -49,6 +50,7 @@ type HistoryItem =
 export default function PurchasesPage() {
   const [orders, setOrders] = useState<OrderWithProduct[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [profile, setProfile] = useState<Pick<Profile, "collective_balance" | "individual_balance"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "history">("invoices");
@@ -64,26 +66,27 @@ export default function PurchasesPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, collective_balance, individual_balance")
       .eq("user_id", user.id)
       .single();
 
-    if (!profile) return;
+    if (!profileData) return;
+    setProfile(profileData);
 
     const [{ data: ordersData }, { data: bookingsData }] = await Promise.all([
       supabase
         .from("orders")
         .select(`*, products (name, description, session_type)`)
-        .eq("member_id", profile.id)
+        .eq("member_id", profileData.id)
         .order("created_at", { ascending: false }),
       supabase
         .from("class_bookings")
         .select(
           `*, class_sessions (start_time, end_time, session_type, class_types (name))`
         )
-        .eq("member_id", profile.id)
+        .eq("member_id", profileData.id)
         .order("booked_at", { ascending: false }),
     ]);
 
@@ -141,9 +144,6 @@ export default function PurchasesPage() {
     );
   }
 
-  const totalSpent = orders.reduce((sum, o) => sum + o.amount, 0);
-  const totalSessions = orders.reduce((sum, o) => sum + o.sessions_purchased, 0);
-
   return (
     <div className="p-4 lg:p-8 space-y-6">
       <div>
@@ -153,17 +153,17 @@ export default function PurchasesPage() {
         </p>
       </div>
 
-      {/* Summary */}
+      {/* Remaining sessions */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
-          <p className="text-gray-400 text-xs mb-1">Total dépensé</p>
+          <p className="text-gray-400 text-xs mb-1">Séances collectives restantes</p>
           <p className="text-2xl font-bold text-[#D4AF37]">
-            {formatPriceFromEuros(totalSpent)}
+            {profile?.collective_balance ?? 0}
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-gray-400 text-xs mb-1">Séances achetées</p>
-          <p className="text-2xl font-bold text-white">{totalSessions}</p>
+          <p className="text-gray-400 text-xs mb-1">Séances individuelles restantes</p>
+          <p className="text-2xl font-bold text-white">{profile?.individual_balance ?? 0}</p>
         </Card>
       </div>
 

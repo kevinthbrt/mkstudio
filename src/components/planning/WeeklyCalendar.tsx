@@ -45,6 +45,13 @@ export interface ClassSessionWithType {
   };
 }
 
+interface AdminMember {
+  id: string;
+  first_name: string;
+  last_name: string;
+  collective_balance: number;
+}
+
 interface CalendarProps {
   memberId?: string;
   memberEmail?: string;
@@ -52,6 +59,7 @@ interface CalendarProps {
   collectiveBalance?: number;
   individualBalance?: number;
   isAdmin?: boolean;
+  adminMembers?: AdminMember[];
   onRequestEdit?: (session: ClassSessionWithType) => void;
   onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
   onRevealWeek?: (sessionIds: string[]) => Promise<void>;
@@ -68,6 +76,7 @@ export function WeeklyCalendar({
   collectiveBalance = 0,
   individualBalance = 0,
   isAdmin = false,
+  adminMembers = [],
   onRequestEdit,
   onToggleVisibility,
   onRevealWeek,
@@ -89,6 +98,9 @@ export function WeeklyCalendar({
   const [friendNames, setFriendNames] = useState("");
   const [sessionBookees, setSessionBookees] = useState<{ name: string; guest_names: string | null }[]>([]);
   const [loadingBookees, setLoadingBookees] = useState(false);
+  const [adminBookingMemberId, setAdminBookingMemberId] = useState("");
+  const [adminBooking, setAdminBooking] = useState(false);
+  const [adminBookingError, setAdminBookingError] = useState("");
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -190,6 +202,135 @@ export function WeeklyCalendar({
       );
     }
     setLoadingBookees(false);
+  }
+
+  async function handleAdminBookForMember(session: ClassSessionWithType) {
+    if (!adminBookingMemberId) return;
+    setAdminBooking(true);
+    setAdminBookingError("");
+
+    const spotsLeft = session.max_participants - session.current_participants;
+    if (spotsLeft < 1) {
+      setAdminBookingError("Ce cours est complet.");
+      setAdminBooking(false);
+      return;
+    }
+
+    const member = adminMembers.find((m) => m.id === adminBookingMemberId);
+    if (!member) { setAdminBooking(false); return; }
+
+    if (member.collective_balance < 1) {
+      setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances collectives.`);
+      setAdminBooking(false);
+      return;
+    }
+
+    const supabase = createClient();
+
+    // Check if already booked
+    const { data: existing } = await supabase
+      .from("class_bookings")
+      .select("id, status")
+      .eq("member_id", adminBookingMemberId)
+      .eq("class_session_id", session.id)
+      .single();
+
+    if (existing?.status === "confirmed") {
+      setAdminBookingError(`${member.first_name} ${member.last_name} est déjà inscrit(e) à ce cours.`);
+      setAdminBooking(false);
+      return;
+    }
+
+    const { error } = await supabase.from("class_bookings").upsert(
+      {
+        member_id: adminBookingMemberId,
+        class_session_id: session.id,
+        status: "confirmed",
+        session_debited: true,
+        booked_at: new Date().toISOString(),
+        cancelled_at: null,
+      },
+      { onConflict: "member_id,class_session_id" }
+    );
+
+    if (error) {
+      setAdminBookingError("Une erreur est survenue. Réessayez.");
+      setAdminBooking(false);
+      return;
+    }
+
+    await supabase.rpc("decrement_collective_balance", { p_member_id: adminBookingMemberId });
+    await supabase.rpc("increment_participants", { session_id: session.id });
+
+    // Refresh bookees list
+    await loadSessionBookees(session.id);
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id
+          ? { ...sess, current_participants: sess.current_participants + 1 }
+          : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
+    );
+
+    setAdminBookingMemberId("");
+    setAdminBooking(false);
+  }
+
+  async function handleAdminCancelBookingForMember(session: ClassSessionWithType, targetMemberId: string) {
+    setAdminBooking(true);
+    setAdminBookingError("");
+
+    const supabase = createClient();
+
+    const { data: existingBooking } = await supabase
+      .from("class_bookings")
+      .select("id, session_debited, guest_names")
+      .eq("member_id", targetMemberId)
+      .eq("class_session_id", session.id)
+      .eq("status", "confirmed")
+      .single();
+
+    if (!existingBooking) {
+      setAdminBooking(false);
+      return;
+    }
+
+    const guests = existingBooking.guest_names
+      ? existingBooking.guest_names.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    const totalRefund = 1 + guests.length;
+
+    await supabase
+      .from("class_bookings")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .eq("id", existingBooking.id);
+
+    if (existingBooking.session_debited) {
+      for (let i = 0; i < totalRefund; i++) {
+        await supabase.rpc("increment_collective_balance", { p_member_id: targetMemberId });
+      }
+    }
+
+    for (let i = 0; i < totalRefund; i++) {
+      await supabase.rpc("decrement_participants", { session_id: session.id });
+    }
+
+    await loadSessionBookees(session.id);
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id
+          ? { ...sess, current_participants: Math.max(0, sess.current_participants - totalRefund) }
+          : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - totalRefund) } : null
+    );
+
+    setAdminBooking(false);
   }
 
   function parseFriends(raw: string): string[] {
@@ -685,6 +826,8 @@ export function WeeklyCalendar({
             setBookingError("");
             setInviteFriends(false);
             setFriendNames("");
+            setAdminBookingMemberId("");
+            setAdminBookingError("");
           }}
           title={selectedSession.class_types.name}
         >
@@ -868,30 +1011,82 @@ export function WeeklyCalendar({
             {isAdmin && (
               <div className="space-y-2">
                 {selectedSession.session_type === "collective" ? (
-                  <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Users size={14} className="text-gray-400" />
-                      <p className="text-xs text-gray-400 font-medium">
-                        {selectedSession.current_participants}/{selectedSession.max_participants} inscrits
-                      </p>
+                  <div className="space-y-2">
+                    {/* Bookees list */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-gray-400" />
+                        <p className="text-xs text-gray-400 font-medium">
+                          {selectedSession.current_participants}/{selectedSession.max_participants} inscrits
+                        </p>
+                      </div>
+                      {loadingBookees ? (
+                        <p className="text-xs text-gray-600">Chargement...</p>
+                      ) : sessionBookees.length > 0 ? (
+                        <ul className="space-y-1">
+                          {sessionBookees.map((b, i) => {
+                            const member = adminMembers.find(
+                              (m) => `${m.first_name} ${m.last_name}`.trim() === b.name
+                            );
+                            return (
+                              <li key={i} className="text-xs text-white flex items-center justify-between gap-2">
+                                <div className="flex flex-col">
+                                  <span>• {b.name}</span>
+                                  {b.guest_names && (
+                                    <span className="text-gray-500 pl-3">
+                                      + {b.guest_names}
+                                    </span>
+                                  )}
+                                </div>
+                                {member && !isPast(selectedSession) && (
+                                  <button
+                                    onClick={() => handleAdminCancelBookingForMember(selectedSession, member.id)}
+                                    disabled={adminBooking}
+                                    className="text-red-400/60 hover:text-red-400 text-[10px] shrink-0 transition-colors disabled:opacity-40"
+                                    title="Désinscrire"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-gray-600 italic">Aucun inscrit</p>
+                      )}
                     </div>
-                    {loadingBookees ? (
-                      <p className="text-xs text-gray-600">Chargement...</p>
-                    ) : sessionBookees.length > 0 ? (
-                      <ul className="space-y-1">
-                        {sessionBookees.map((b, i) => (
-                          <li key={i} className="text-xs text-white flex flex-col">
-                            <span>• {b.name}</span>
-                            {b.guest_names && (
-                              <span className="text-gray-500 pl-3">
-                                + {b.guest_names}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-gray-600 italic">Aucun inscrit</p>
+
+                    {/* Admin book for member */}
+                    {!isPast(selectedSession) && adminMembers.length > 0 && (
+                      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-medium text-gray-300">Inscrire un adhérent</p>
+                        {adminBookingError && (
+                          <p className="text-xs text-red-400">{adminBookingError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <select
+                            value={adminBookingMemberId}
+                            onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                            className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                          >
+                            <option value="">Choisir un adhérent...</option>
+                            {adminMembers.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.first_name} {m.last_name} ({m.collective_balance} séance{m.collective_balance !== 1 ? "s" : ""})
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAdminBookForMember(selectedSession)}
+                            loading={adminBooking}
+                            disabled={!adminBookingMemberId}
+                          >
+                            Inscrire
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (
