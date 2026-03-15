@@ -8,17 +8,13 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Only admins can insert/delete their own subscriptions
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 
+-- Only admins can manage their own subscriptions
 CREATE POLICY "Admins can manage their own push subscriptions"
   ON push_subscriptions
   FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  USING (auth.uid() = user_id AND public.is_admin())
+  WITH CHECK (auth.uid() = user_id AND public.is_admin());
 
--- Service role can read all subscriptions (for sending push)
-CREATE POLICY "Service role can read all subscriptions"
-  ON push_subscriptions
-  FOR SELECT
-  USING (true);
+-- Service role bypasses RLS automatically — no extra SELECT policy needed

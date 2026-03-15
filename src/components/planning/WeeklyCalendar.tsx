@@ -270,23 +270,21 @@ export function WeeklyCalendar({
         )
       );
 
-      // Send cancellation email (non-blocking)
-      if (memberEmail && memberFirstName) {
-        fetch("/api/emails/cancellation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: memberEmail,
-            firstName: memberFirstName,
-            sessionName: session.class_types.name,
-            sessionDate: formatDate(session.start_time),
-            sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
-            refundedSessions: existingBooking ? 1 + (existingBooking.guest_names ? existingBooking.guest_names.split(",").filter(Boolean).length : 0) : 1,
-            sessionType: session.session_type,
-          }),
-        }).catch(() => {});
+      // Send cancellation email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/cancellation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          refundedSessions: existingBooking ? 1 + (existingBooking.guest_names ? existingBooking.guest_names.split(",").filter(Boolean).length : 0) : 1,
+          sessionType: session.session_type,
+        }),
+      }).catch(() => {});
 
-        // Notify admin via push
+      // Notify admin via push
+      if (memberFirstName) {
         fetch("/api/notifications/push-member-event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -368,23 +366,21 @@ export function WeeklyCalendar({
         )
       );
 
-      // Send booking confirmation email (non-blocking)
-      if (memberEmail && memberFirstName) {
-        fetch("/api/emails/booking", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: memberEmail,
-            firstName: memberFirstName,
-            sessionName: session.class_types.name,
-            sessionDate: formatDate(session.start_time),
-            sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
-            coachName: session.coach_name,
-            guests: guests.length > 0 ? guests : undefined,
-          }),
-        }).catch(() => {});
+      // Send booking confirmation email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          coachName: session.coach_name,
+          guests: guests.length > 0 ? guests : undefined,
+        }),
+      }).catch(() => {});
 
-        // Notify admin via push
+      // Notify admin via push
+      if (memberFirstName) {
         fetch("/api/notifications/push-member-event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

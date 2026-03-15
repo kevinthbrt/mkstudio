@@ -79,12 +79,8 @@ export default function RegisterPage() {
         });
       }
 
-      // Send welcome email (non-blocking)
-      fetch("/api/emails/welcome", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), firstName: firstName.trim() }),
-      }).catch(() => {});
+      // Send welcome email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/welcome", { method: "POST" }).catch(() => {});
 
       router.push("/dashboard");
       return;

@@ -1,16 +1,35 @@
+import { createClient } from "@/lib/supabase/server";
 import { sendCancellationEmail } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { email, firstName, sessionName, sessionDate, sessionTime, refundedSessions, sessionType } = body;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  if (!email || !firstName || !sessionName) {
-    return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
-  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, email")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
+
+  const body = await request.json();
+  const { sessionName, sessionDate, sessionTime, refundedSessions, sessionType } = body;
+
+  if (!sessionName) return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
 
   try {
-    await sendCancellationEmail({ to: email, firstName, sessionName, sessionDate, sessionTime, refundedSessions, sessionType });
+    await sendCancellationEmail({
+      to: profile.email,
+      firstName: profile.first_name,
+      sessionName,
+      sessionDate,
+      sessionTime,
+      refundedSessions,
+      sessionType,
+    });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[email/cancellation]", err);
