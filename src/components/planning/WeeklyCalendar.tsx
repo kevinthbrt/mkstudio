@@ -52,6 +52,7 @@ interface CalendarProps {
   isAdmin?: boolean;
   onRequestEdit?: (session: ClassSessionWithType) => void;
   onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
+  onRevealWeek?: (sessionIds: string[]) => Promise<void>;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -64,6 +65,7 @@ export function WeeklyCalendar({
   isAdmin = false,
   onRequestEdit,
   onToggleVisibility,
+  onRevealWeek,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
@@ -73,6 +75,7 @@ export function WeeklyCalendar({
   const [booking, setBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [revealingWeek, setRevealingWeek] = useState(false);
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -301,15 +304,43 @@ export function WeeklyCalendar({
   return (
     <div className="space-y-4">
       {/* Week navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={prevWeek}>
           <ChevronLeft size={16} />
         </Button>
-        <div className="text-center">
+        <div className="flex-1 flex flex-col items-center gap-1.5">
           <p className="text-white font-medium text-sm">
             {formatDate(weekDays[0].toISOString())} —{" "}
             {formatDate(weekDays[6].toISOString())}
           </p>
+          {isAdmin && onRevealWeek && (() => {
+            const hiddenIds = sessions
+              .filter((s) => s.is_hidden && s.session_type === "collective")
+              .map((s) => s.id);
+            if (hiddenIds.length === 0) return null;
+            return (
+              <button
+                type="button"
+                disabled={revealingWeek}
+                onClick={async () => {
+                  setRevealingWeek(true);
+                  await onRevealWeek(hiddenIds);
+                  setSessions((s) =>
+                    s.map((sess) =>
+                      hiddenIds.includes(sess.id) ? { ...sess, is_hidden: false } : sess
+                    )
+                  );
+                  setRevealingWeek(false);
+                }}
+                className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-50"
+              >
+                <Eye size={11} />
+                {revealingWeek
+                  ? "Déblocage..."
+                  : `Rendre visible toute la semaine (${hiddenIds.length})`}
+              </button>
+            );
+          })()}
         </div>
         <Button variant="ghost" size="sm" onClick={nextWeek}>
           <ChevronRight size={16} />

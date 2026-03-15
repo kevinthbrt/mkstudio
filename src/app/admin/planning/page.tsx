@@ -350,6 +350,15 @@ export default function AdminPlanningPage() {
     setRefreshKey((k) => k + 1);
   }
 
+  async function handleRevealWeek(sessionIds: string[]) {
+    const supabase = createClient();
+    await supabase
+      .from("class_sessions")
+      .update({ is_hidden: false })
+      .in("id", sessionIds);
+    setRefreshKey((k) => k + 1);
+  }
+
   const isIndividual = sessionForm.session_type === "individual";
   const editIsIndividual = editForm.session_type === "individual";
 
@@ -379,6 +388,7 @@ export default function AdminPlanningPage() {
         isAdmin
         onRequestEdit={openEditModal}
         onToggleVisibility={handleToggleVisibility}
+        onRevealWeek={handleRevealWeek}
       />
 
       {/* Create session modal */}
