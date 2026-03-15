@@ -70,6 +70,9 @@ export function WeeklyCalendar({
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
   const [bookings, setBookings] = useState<Record<string, string>>({});
+  const [bookingGuests, setBookingGuests] = useState<Record<string, string | null>>({});
+  const [localCollectiveBalance, setLocalCollectiveBalance] = useState(collectiveBalance);
+  const [localIndividualBalance, setLocalIndividualBalance] = useState(individualBalance);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ClassSessionWithType | null>(null);
   const [booking, setBooking] = useState(false);
@@ -143,14 +146,17 @@ export function WeeklyCalendar({
     if (memberId) {
       const { data: bookingsData } = await supabase
         .from("class_bookings")
-        .select("class_session_id, status")
+        .select("class_session_id, status, guest_names")
         .eq("member_id", memberId);
 
       const bookingMap: Record<string, string> = {};
-      (bookingsData || []).forEach((b) => {
+      const guestMap: Record<string, string | null> = {};
+      (bookingsData || []).forEach((b: any) => {
         bookingMap[b.class_session_id] = b.status;
+        guestMap[b.class_session_id] = b.guest_names ?? null;
       });
       setBookings(bookingMap);
+      setBookingGuests(guestMap);
     }
 
     setLoading(false);
@@ -205,13 +211,18 @@ export function WeeklyCalendar({
 
       const { data: existingBooking } = await supabase
         .from("class_bookings")
-        .select("id, session_debited")
+        .select("id, session_debited, guest_names")
         .eq("member_id", memberId)
         .eq("class_session_id", session.id)
         .eq("status", "confirmed")
         .single();
 
       if (existingBooking) {
+        const guests = existingBooking.guest_names
+          ? existingBooking.guest_names.split(",").map((s: string) => s.trim()).filter(Boolean)
+          : [];
+        const totalRefund = 1 + guests.length;
+
         await supabase
           .from("class_bookings")
           .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
@@ -219,27 +230,36 @@ export function WeeklyCalendar({
 
         if (existingBooking.session_debited) {
           if (session.session_type === "individual") {
-            await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
+            for (let i = 0; i < totalRefund; i++) {
+              await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
+            }
+            setLocalIndividualBalance((b) => b + totalRefund);
           } else {
-            await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
+            for (let i = 0; i < totalRefund; i++) {
+              await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
+            }
+            setLocalCollectiveBalance((b) => b + totalRefund);
           }
         }
 
-        await supabase.rpc("decrement_participants", { session_id: session.id });
+        for (let i = 0; i < totalRefund; i++) {
+          await supabase.rpc("decrement_participants", { session_id: session.id });
+        }
       }
 
       setBookings((b) => ({ ...b, [session.id]: "cancelled" }));
+      setBookingGuests((g) => ({ ...g, [session.id]: null }));
       setSessions((s) =>
         s.map((sess) =>
           sess.id === session.id
-            ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) }
+            ? { ...sess, current_participants: Math.max(0, sess.current_participants - (existingBooking ? 1 + (existingBooking.guest_names ? existingBooking.guest_names.split(",").filter(Boolean).length : 0) : 1)) }
             : sess
         )
       );
     } else {
       const guests = inviteFriends ? parseFriends(friendNames) : [];
       const totalSpots = 1 + guests.length;
-      const balance = session.session_type === "individual" ? individualBalance : collectiveBalance;
+      const balance = session.session_type === "individual" ? localIndividualBalance : localCollectiveBalance;
 
       if (balance < totalSpots && !isAdmin) {
         setBookingError(
@@ -283,10 +303,12 @@ export function WeeklyCalendar({
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
         }
+        setLocalIndividualBalance((b) => b - totalSpots);
       } else {
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
         }
+        setLocalCollectiveBalance((b) => b - totalSpots);
       }
 
       for (let i = 0; i < totalSpots; i++) {
@@ -294,6 +316,7 @@ export function WeeklyCalendar({
       }
 
       setBookings((b) => ({ ...b, [session.id]: "confirmed" }));
+      setBookingGuests((g) => ({ ...g, [session.id]: guests.length > 0 ? guests.join(", ") : null }));
       setSessions((s) =>
         s.map((sess) =>
           sess.id === session.id
@@ -674,20 +697,30 @@ export function WeeklyCalendar({
                   <p className="text-xs text-gray-400">
                     Solde collectif :{" "}
                     <span className="text-[#D4AF37] font-semibold">
-                      {collectiveBalance} séance(s)
+                      {localCollectiveBalance} séance(s)
                     </span>
                   </p>
                 </div>
 
                 {bookings[selectedSession.id] === "confirmed" ? (
-                  <Button
-                    variant="outline"
-                    className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    onClick={() => handleBook(selectedSession)}
-                    loading={booking}
-                  >
-                    Se désinscrire
-                  </Button>
+                  <div className="space-y-2">
+                    {bookingGuests[selectedSession.id] && (
+                      <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 text-xs text-gray-400 border border-[#2a2a2a]">
+                        Inscrit(e) avec : <span className="text-white">{bookingGuests[selectedSession.id]}</span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
+                      onClick={() => handleBook(selectedSession)}
+                      loading={booking}
+                    >
+                      Se désinscrire
+                      {bookingGuests[selectedSession.id]
+                        ? ` (${1 + bookingGuests[selectedSession.id]!.split(",").filter(Boolean).length} séances remboursées)`
+                        : " (1 séance remboursée)"}
+                    </Button>
+                  </div>
                 ) : (
                   <>
                     {/* Invite friends */}
@@ -725,7 +758,7 @@ export function WeeklyCalendar({
                       loading={booking}
                       disabled={
                         selectedSession.current_participants >= selectedSession.max_participants ||
-                        collectiveBalance <= 0
+                        localCollectiveBalance <= 0
                       }
                     >
                       {selectedSession.current_participants >= selectedSession.max_participants

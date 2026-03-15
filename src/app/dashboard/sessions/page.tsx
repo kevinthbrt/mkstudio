@@ -13,6 +13,7 @@ interface BookingWithSession {
   booked_at: string;
   cancelled_at: string | null;
   session_debited: boolean;
+  guest_names: string | null;
   class_sessions: {
     id: string;
     start_time: string;
@@ -87,23 +88,34 @@ export default function SessionsPage() {
     setCancellingId(booking.id);
     const supabase = createClient();
 
+    const guests = booking.guest_names
+      ? booking.guest_names.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    const totalRefund = 1 + guests.length;
+
     await supabase
       .from("class_bookings")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", booking.id);
 
-    await supabase.rpc("decrement_participants", {
-      session_id: booking.class_sessions.id,
-    });
+    for (let i = 0; i < totalRefund; i++) {
+      await supabase.rpc("decrement_participants", {
+        session_id: booking.class_sessions.id,
+      });
+    }
 
     if (booking.session_debited) {
       const isIndividual = booking.class_sessions.session_type === "individual";
       if (isIndividual) {
-        await supabase.rpc("increment_individual_balance", { p_member_id: profileId });
-        setIndividualBalance((s) => s + 1);
+        for (let i = 0; i < totalRefund; i++) {
+          await supabase.rpc("increment_individual_balance", { p_member_id: profileId });
+        }
+        setIndividualBalance((s) => s + totalRefund);
       } else {
-        await supabase.rpc("increment_collective_balance", { p_member_id: profileId });
-        setCollectiveBalance((s) => s + 1);
+        for (let i = 0; i < totalRefund; i++) {
+          await supabase.rpc("increment_collective_balance", { p_member_id: profileId });
+        }
+        setCollectiveBalance((s) => s + totalRefund);
       }
     }
 
@@ -205,6 +217,13 @@ export default function SessionsPage() {
                         </span>
                       </div>
 
+                      {booking.guest_names && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-[#D4AF37]/80">
+                          <Users size={12} />
+                          Avec : {booking.guest_names}
+                        </div>
+                      )}
+
                       {!cancellable && hoursLeft > 0 && (
                         <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-400">
                           <AlertTriangle size={12} />
@@ -223,7 +242,9 @@ export default function SessionsPage() {
                         loading={cancellingId === booking.id}
                         className="text-red-400 border-red-400/30 hover:bg-red-400/10"
                       >
-                        Annuler ce cours (séance remboursée)
+                        {booking.guest_names
+                          ? `Annuler (${1 + booking.guest_names.split(",").filter(Boolean).length} séances remboursées)`
+                          : "Annuler ce cours (1 séance remboursée)"}
                       </Button>
                     </div>
                   )}
