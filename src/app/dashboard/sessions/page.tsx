@@ -69,7 +69,7 @@ export default function SessionsPage() {
         )
       `)
       .eq("member_id", profile.id)
-      .order("class_sessions(start_time)", { ascending: false });
+      .order("booked_at", { ascending: false });
 
     setBookings((data as any[]) || []);
     setLoading(false);
@@ -123,12 +123,12 @@ export default function SessionsPage() {
     loadBookings();
   }
 
-  const upcomingBookings = bookings.filter(
-    (b) => b.status === "confirmed" && new Date(b.class_sessions.start_time) >= new Date()
-  );
-  const pastBookings = bookings.filter(
-    (b) => b.status === "cancelled" || new Date(b.class_sessions.start_time) < new Date()
-  );
+  const upcomingBookings = bookings
+    .filter((b) => b.class_sessions && b.status === "confirmed" && new Date(b.class_sessions.start_time) >= new Date())
+    .sort((a, b) => new Date(a.class_sessions.start_time).getTime() - new Date(b.class_sessions.start_time).getTime());
+  const pastBookings = bookings
+    .filter((b) => b.class_sessions && (b.status === "cancelled" || new Date(b.class_sessions.start_time) < new Date()))
+    .sort((a, b) => new Date(b.class_sessions.start_time).getTime() - new Date(a.class_sessions.start_time).getTime());
 
   if (loading) {
     return (

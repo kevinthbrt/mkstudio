@@ -33,9 +33,8 @@ export default async function MemberDashboard() {
     `)
     .eq("member_id", profile.id)
     .eq("status", "confirmed")
-    .gte("class_sessions.start_time", new Date().toISOString())
-    .order("class_sessions(start_time)", { ascending: true })
-    .limit(5);
+    .order("booked_at", { ascending: false })
+    .limit(20);
 
   const { count: totalBookings } = await supabase
     .from("class_bookings")
@@ -123,9 +122,15 @@ export default async function MemberDashboard() {
           </Link>
         </div>
 
-        {upcomingBookings && upcomingBookings.length > 0 ? (
+        {(() => {
+          const now = new Date().toISOString();
+          const filtered = (upcomingBookings || [])
+            .filter((b: any) => b.class_sessions && new Date(b.class_sessions.start_time) >= new Date())
+            .sort((a: any, b: any) => new Date(a.class_sessions.start_time).getTime() - new Date(b.class_sessions.start_time).getTime())
+            .slice(0, 5);
+          return filtered.length > 0 ? (
           <div className="space-y-2">
-            {upcomingBookings.map((booking) => {
+            {filtered.map((booking: any) => {
               const session = booking.class_sessions as any;
               if (!session) return null;
               const isIndividual = session.session_type === "individual";
@@ -166,6 +171,7 @@ export default async function MemberDashboard() {
           </div>
         ) : (
           <Link href="/dashboard/planning">
+
             <div className="rounded-2xl p-8 text-center transition-all hover:border-[#D4AF37]/20 cursor-pointer"
               style={{
                 background: "linear-gradient(135deg, rgba(30,28,45,0.5) 0%, rgba(22,21,38,0.6) 100%)",
@@ -181,7 +187,8 @@ export default async function MemberDashboard() {
               </p>
             </div>
           </Link>
-        )}
+        );
+        })()}
       </div>
     </div>
   );

@@ -53,6 +53,7 @@ interface CalendarProps {
   onRequestEdit?: (session: ClassSessionWithType) => void;
   onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
   onRevealWeek?: (sessionIds: string[]) => Promise<void>;
+  onBalanceChange?: (collective: number, individual: number) => void;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -66,6 +67,7 @@ export function WeeklyCalendar({
   onRequestEdit,
   onToggleVisibility,
   onRevealWeek,
+  onBalanceChange,
 }: CalendarProps) {
   const [currentWeek, setCurrentWeek] = useState<Date>(new Date());
   const [sessions, setSessions] = useState<ClassSessionWithType[]>([]);
@@ -233,12 +235,12 @@ export function WeeklyCalendar({
             for (let i = 0; i < totalRefund; i++) {
               await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
             }
-            setLocalIndividualBalance((b) => b + totalRefund);
+            setLocalIndividualBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(localCollectiveBalance, next); return next; });
           } else {
             for (let i = 0; i < totalRefund; i++) {
               await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
             }
-            setLocalCollectiveBalance((b) => b + totalRefund);
+            setLocalCollectiveBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(next, localIndividualBalance); return next; });
           }
         }
 
@@ -303,12 +305,12 @@ export function WeeklyCalendar({
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
         }
-        setLocalIndividualBalance((b) => b - totalSpots);
+        setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next); return next; });
       } else {
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
         }
-        setLocalCollectiveBalance((b) => b - totalSpots);
+        setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance); return next; });
       }
 
       for (let i = 0; i < totalSpots; i++) {
