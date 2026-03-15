@@ -10,6 +10,8 @@ export default function MemberPlanningPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberFirstName, setMemberFirstName] = useState("");
   const [collectiveBalance, setCollectiveBalance] = useState(0);
   const [individualBalance, setIndividualBalance] = useState(0);
 
@@ -21,12 +23,14 @@ export default function MemberPlanningPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, collective_balance, individual_balance")
+        .select("id, collective_balance, individual_balance, first_name, email")
         .eq("user_id", user.id)
         .single();
 
       if (!profile) { router.push("/login"); return; }
       setProfileId(profile.id);
+      setMemberEmail(profile.email ?? user.email ?? "");
+      setMemberFirstName(profile.first_name ?? "");
       setCollectiveBalance(profile.collective_balance);
       setIndividualBalance(profile.individual_balance);
       setLoading(false);
@@ -79,6 +83,8 @@ export default function MemberPlanningPage() {
 
       <WeeklyCalendar
         memberId={profileId}
+        memberEmail={memberEmail}
+        memberFirstName={memberFirstName}
         collectiveBalance={collectiveBalance}
         individualBalance={individualBalance}
         onBalanceChange={(c, i) => {

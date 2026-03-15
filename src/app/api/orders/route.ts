@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -84,6 +85,18 @@ export async function POST(request: NextRequest) {
       .update({ next_invoice_number: invoiceSettings.next_invoice_number + 1 })
       .eq("id", invoiceSettings.id);
   }
+
+  // Send purchase confirmation email (non-blocking)
+  sendPurchaseConfirmationEmail({
+    to: user.email!,
+    firstName: profile.first_name ?? "",
+    productName: product.name,
+    amount: product.price,
+    sessionCount: product.session_count,
+    sessionType: product.session_type ?? "collective",
+    invoiceNumber,
+    orderId: order.id,
+  }).catch((err) => console.error("[orders] email error:", err));
 
   return NextResponse.json({
     success: true,
