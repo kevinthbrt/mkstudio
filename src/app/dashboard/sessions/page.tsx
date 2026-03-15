@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Calendar, Clock, User, AlertTriangle, Users, Zap } from "lucide-react";
+import { Calendar, Clock, User, AlertTriangle, Users, Zap, UserPlus } from "lucide-react";
 import { formatDateTime, formatTime } from "@/lib/utils";
 
 interface BookingWithSession {
@@ -36,6 +36,7 @@ export default function SessionsPage() {
   const [profileId, setProfileId] = useState<string>("");
   const [collectiveBalance, setCollectiveBalance] = useState(0);
   const [individualBalance, setIndividualBalance] = useState(0);
+  const [duoBalance, setDuoBalance] = useState(0);
 
   useEffect(() => {
     loadBookings();
@@ -50,7 +51,7 @@ export default function SessionsPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, collective_balance, individual_balance")
+      .select("id, collective_balance, individual_balance, duo_balance")
       .eq("user_id", user.id)
       .single();
 
@@ -58,6 +59,7 @@ export default function SessionsPage() {
     setProfileId(profile.id);
     setCollectiveBalance(profile.collective_balance);
     setIndividualBalance(profile.individual_balance);
+    setDuoBalance(profile.duo_balance ?? 0);
 
     const { data } = await supabase
       .from("class_bookings")
@@ -105,12 +107,17 @@ export default function SessionsPage() {
     }
 
     if (booking.session_debited) {
-      const isIndividual = booking.class_sessions.session_type === "individual";
-      if (isIndividual) {
+      const sessionType = booking.class_sessions.session_type;
+      if (sessionType === "individual") {
         for (let i = 0; i < totalRefund; i++) {
           await supabase.rpc("increment_individual_balance", { p_member_id: profileId });
         }
         setIndividualBalance((s) => s + totalRefund);
+      } else if (sessionType === "duo") {
+        for (let i = 0; i < totalRefund; i++) {
+          await supabase.rpc("increment_duo_balance", { p_member_id: profileId });
+        }
+        setDuoBalance((s) => s + totalRefund);
       } else {
         for (let i = 0; i < totalRefund; i++) {
           await supabase.rpc("increment_collective_balance", { p_member_id: profileId });
@@ -160,6 +167,13 @@ export default function SessionsPage() {
               <p className="text-gray-500 text-xs">individuel</p>
             </div>
           </div>
+          <div className="flex items-center gap-2 bg-[#111111] border border-purple-500/20 rounded-xl px-3 py-2">
+            <UserPlus size={14} className="text-purple-400" />
+            <div>
+              <p className="text-purple-400 font-bold text-sm">{duoBalance}</p>
+              <p className="text-gray-500 text-xs">duo</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -182,7 +196,9 @@ export default function SessionsPage() {
               const cancellable = canCancel(booking);
               const sessionStart = new Date(booking.class_sessions.start_time);
               const hoursLeft = (sessionStart.getTime() - new Date().getTime()) / (1000 * 60 * 60);
-              const isIndividual = booking.class_sessions.session_type === "individual";
+              const sessionType = booking.class_sessions.session_type;
+              const isIndividual = sessionType === "individual";
+              const isDuo = sessionType === "duo";
 
               return (
                 <div key={booking.id} className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-4">
@@ -199,6 +215,7 @@ export default function SessionsPage() {
                         <div className="flex gap-1">
                           <Badge variant="green">Confirmé</Badge>
                           {isIndividual && <Badge variant="blue">Individuel</Badge>}
+                          {isDuo && <Badge variant="purple">Duo</Badge>}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">

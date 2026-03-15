@@ -35,7 +35,7 @@ export interface ClassSessionWithType {
   min_cancel_hours: number;
   is_cancelled: boolean;
   is_hidden: boolean;
-  session_type: "collective" | "individual";
+  session_type: "collective" | "individual" | "duo";
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
   class_types: {
@@ -50,6 +50,7 @@ interface AdminMember {
   first_name: string;
   last_name: string;
   collective_balance: number;
+  duo_balance: number;
 }
 
 interface CalendarProps {
@@ -58,12 +59,13 @@ interface CalendarProps {
   memberFirstName?: string;
   collectiveBalance?: number;
   individualBalance?: number;
+  duoBalance?: number;
   isAdmin?: boolean;
   adminMembers?: AdminMember[];
   onRequestEdit?: (session: ClassSessionWithType) => void;
   onToggleVisibility?: (session: ClassSessionWithType) => Promise<void>;
   onRevealWeek?: (sessionIds: string[]) => Promise<void>;
-  onBalanceChange?: (collective: number, individual: number) => void;
+  onBalanceChange?: (collective: number, individual: number, duo: number) => void;
 }
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -75,6 +77,7 @@ export function WeeklyCalendar({
   memberFirstName,
   collectiveBalance = 0,
   individualBalance = 0,
+  duoBalance = 0,
   isAdmin = false,
   adminMembers = [],
   onRequestEdit,
@@ -88,6 +91,7 @@ export function WeeklyCalendar({
   const [bookingGuests, setBookingGuests] = useState<Record<string, string | null>>({});
   const [localCollectiveBalance, setLocalCollectiveBalance] = useState(collectiveBalance);
   const [localIndividualBalance, setLocalIndividualBalance] = useState(individualBalance);
+  const [localDuoBalance, setLocalDuoBalance] = useState(duoBalance);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ClassSessionWithType | null>(null);
   const [booking, setBooking] = useState(false);
@@ -219,10 +223,19 @@ export function WeeklyCalendar({
     const member = adminMembers.find((m) => m.id === adminBookingMemberId);
     if (!member) { setAdminBooking(false); return; }
 
-    if (member.collective_balance < 1) {
-      setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances collectives.`);
-      setAdminBooking(false);
-      return;
+    const isDuo = session.session_type === "duo";
+    if (isDuo) {
+      if (member.duo_balance < 1) {
+        setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances duo.`);
+        setAdminBooking(false);
+        return;
+      }
+    } else {
+      if (member.collective_balance < 1) {
+        setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances collectives.`);
+        setAdminBooking(false);
+        return;
+      }
     }
 
     const supabase = createClient();
@@ -259,7 +272,11 @@ export function WeeklyCalendar({
       return;
     }
 
-    await supabase.rpc("decrement_collective_balance", { p_member_id: adminBookingMemberId });
+    if (isDuo) {
+      await supabase.rpc("decrement_duo_balance", { p_member_id: adminBookingMemberId });
+    } else {
+      await supabase.rpc("decrement_collective_balance", { p_member_id: adminBookingMemberId });
+    }
     await supabase.rpc("increment_participants", { session_id: session.id });
 
     // Refresh bookees list
@@ -309,8 +326,11 @@ export function WeeklyCalendar({
       .eq("id", existingBooking.id);
 
     if (existingBooking.session_debited) {
+      const refundRpc = session.session_type === "duo"
+        ? "increment_duo_balance"
+        : "increment_collective_balance";
       for (let i = 0; i < totalRefund; i++) {
-        await supabase.rpc("increment_collective_balance", { p_member_id: targetMemberId });
+        await supabase.rpc(refundRpc, { p_member_id: targetMemberId });
       }
     }
 
@@ -342,7 +362,7 @@ export function WeeklyCalendar({
 
   async function handleBook(session: ClassSessionWithType) {
     if (!memberId) return;
-    if (!isAdmin && session.session_type === "individual") return;
+    if (!isAdmin && (session.session_type === "individual" || session.session_type === "duo")) return;
 
     setBooking(true);
     setBookingError("");
@@ -387,12 +407,17 @@ export function WeeklyCalendar({
             for (let i = 0; i < totalRefund; i++) {
               await supabase.rpc("increment_individual_balance", { p_member_id: memberId });
             }
-            setLocalIndividualBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(localCollectiveBalance, next); return next; });
+            setLocalIndividualBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(localCollectiveBalance, next, localDuoBalance); return next; });
+          } else if (session.session_type === "duo") {
+            for (let i = 0; i < totalRefund; i++) {
+              await supabase.rpc("increment_duo_balance", { p_member_id: memberId });
+            }
+            setLocalDuoBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(localCollectiveBalance, localIndividualBalance, next); return next; });
           } else {
             for (let i = 0; i < totalRefund; i++) {
               await supabase.rpc("increment_collective_balance", { p_member_id: memberId });
             }
-            setLocalCollectiveBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(next, localIndividualBalance); return next; });
+            setLocalCollectiveBalance((prev) => { const next = prev + totalRefund; onBalanceChange?.(next, localIndividualBalance, localDuoBalance); return next; });
           }
         }
 
@@ -441,12 +466,18 @@ export function WeeklyCalendar({
     } else {
       const guests = inviteFriends ? parseFriends(friendNames) : [];
       const totalSpots = 1 + guests.length;
-      const balance = session.session_type === "individual" ? localIndividualBalance : localCollectiveBalance;
+      const balance = session.session_type === "individual"
+        ? localIndividualBalance
+        : session.session_type === "duo"
+        ? localDuoBalance
+        : localCollectiveBalance;
 
       if (balance < totalSpots && !isAdmin) {
         setBookingError(
           session.session_type === "individual"
             ? "Solde individuel insuffisant."
+            : session.session_type === "duo"
+            ? "Solde duo insuffisant."
             : `Solde collectif insuffisant (${balance} séance(s) disponible(s), ${totalSpots} nécessaire(s)).`
         );
         setBooking(false);
@@ -485,12 +516,17 @@ export function WeeklyCalendar({
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
         }
-        setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next); return next; });
+        setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next, localDuoBalance); return next; });
+      } else if (session.session_type === "duo") {
+        for (let i = 0; i < totalSpots; i++) {
+          await supabase.rpc("decrement_duo_balance", { p_member_id: memberId });
+        }
+        setLocalDuoBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, localIndividualBalance, next); return next; });
       } else {
         for (let i = 0; i < totalSpots; i++) {
           await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
         }
-        setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance); return next; });
+        setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance, localDuoBalance); return next; });
       }
 
       for (let i = 0; i < totalSpots; i++) {
@@ -561,10 +597,12 @@ export function WeeklyCalendar({
     const isBooked = bookings[session.id] === "confirmed";
     const isFull = session.current_participants >= session.max_participants;
     const isIndividual = session.session_type === "individual";
+    const isDuo = session.session_type === "duo";
 
     if (isPast(session)) return <Badge variant="gray">Terminé</Badge>;
     if (isBooked) return <Badge variant="green">Inscrit</Badge>;
-    if (isIndividual) return <Badge variant="blue">Individuel</Badge>;
+    if (isIndividual) return <Badge variant="blue">Solo</Badge>;
+    if (isDuo) return <Badge variant="purple">Duo</Badge>;
     if (isFull) return <Badge variant="red">Complet</Badge>;
     return null;
   }
@@ -653,6 +691,7 @@ export function WeeklyCalendar({
                 const isBooked = bookings[session.id] === "confirmed";
                 const isFull = session.current_participants >= session.max_participants;
                 const isIndividual = session.session_type === "individual";
+                const isDuo = session.session_type === "duo";
                 const isHidden = session.is_hidden;
                 const past = isPast(session);
 
@@ -668,13 +707,15 @@ export function WeeklyCalendar({
                         ? "bg-[#D4AF37]/10 border-[#D4AF37]/30"
                         : isIndividual
                         ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
+                        : isDuo
+                        ? "bg-purple-500/10 border-purple-500/20 hover:border-purple-500/40"
                         : "bg-[#111111] border-[#1f1f1f] hover:border-[#D4AF37]/30"
                     }`}
                     onClick={() => {
                       setSelectedSession(session);
                       setBookingError("");
                       setSessionBookees([]);
-                      if (isAdmin && session.session_type === "collective") {
+                      if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
                         loadSessionBookees(session.id);
                       }
                     }}
@@ -710,7 +751,12 @@ export function WeeklyCalendar({
                           <p className="text-blue-400 text-xs mt-0.5 font-medium">
                             {isAdmin && session.assigned_member_name
                               ? session.assigned_member_name
-                              : "Cours individuel"}
+                              : "Coaching solo"}
+                          </p>
+                        )}
+                        {isDuo && (
+                          <p className="text-purple-400 text-xs mt-0.5 font-medium">
+                            Coaching duo · {session.current_participants}/{session.max_participants}
                           </p>
                         )}
                       </div>
@@ -747,6 +793,7 @@ export function WeeklyCalendar({
                   {daySessions.map((session) => {
                     const isBooked = bookings[session.id] === "confirmed";
                     const isIndividual = session.session_type === "individual";
+                    const isDuo = session.session_type === "duo";
                     const isHidden = session.is_hidden;
                     const past = isPast(session);
 
@@ -761,7 +808,7 @@ export function WeeklyCalendar({
                             : isBooked
                             ? "ring-1 ring-[#D4AF37]/50 hover:opacity-90"
                             : "hover:opacity-90"
-                        } ${isIndividual ? "border border-blue-500/30" : "border border-white/5"}`}
+                        } ${isIndividual ? "border border-blue-500/30" : isDuo ? "border border-purple-500/30" : "border border-white/5"}`}
                         style={{
                           backgroundColor: past
                             ? "#111"
@@ -843,6 +890,8 @@ export function WeeklyCalendar({
             <div className="flex gap-2">
               {selectedSession.session_type === "collective" ? (
                 <Badge variant="gray">Cours collectif</Badge>
+              ) : selectedSession.session_type === "duo" ? (
+                <Badge variant="purple">Coaching duo</Badge>
               ) : (
                 <Badge variant="blue">Cours individuel</Badge>
               )}
@@ -867,6 +916,15 @@ export function WeeklyCalendar({
                 <div className="bg-[#1a1a1a] rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">Places</p>
                   <p className="text-white text-sm font-medium flex items-center gap-1">
+                    <Users size={12} />
+                    {selectedSession.current_participants}/{selectedSession.max_participants}
+                  </p>
+                </div>
+              )}
+              {selectedSession.session_type === "duo" && (
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Inscrits</p>
+                  <p className="text-purple-400 text-sm font-medium flex items-center gap-1">
                     <Users size={12} />
                     {selectedSession.current_participants}/{selectedSession.max_participants}
                   </p>
@@ -1007,16 +1065,34 @@ export function WeeklyCalendar({
               </div>
             )}
 
+            {memberId && !isAdmin && selectedSession.session_type === "duo" && (
+              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                <p className="text-sm text-purple-400">
+                  Ce coaching duo a été planifié par votre coach.
+                </p>
+                {bookings[selectedSession.id] === "confirmed" && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-3 text-red-400 border-red-400/30 hover:bg-red-400/10"
+                    onClick={() => handleBook(selectedSession)}
+                    loading={booking}
+                  >
+                    Annuler ma participation
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Admin view */}
             {isAdmin && (
               <div className="space-y-2">
-                {selectedSession.session_type === "collective" ? (
+                {(selectedSession.session_type === "collective" || selectedSession.session_type === "duo") ? (
                   <div className="space-y-2">
                     {/* Bookees list */}
-                    <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                    <div className={`rounded-lg p-3 space-y-2 ${selectedSession.session_type === "duo" ? "bg-purple-500/5 border border-purple-500/20" : "bg-[#1a1a1a]"}`}>
                       <div className="flex items-center gap-2">
-                        <Users size={14} className="text-gray-400" />
-                        <p className="text-xs text-gray-400 font-medium">
+                        <Users size={14} className={selectedSession.session_type === "duo" ? "text-purple-400" : "text-gray-400"} />
+                        <p className={`text-xs font-medium ${selectedSession.session_type === "duo" ? "text-purple-400" : "text-gray-400"}`}>
                           {selectedSession.current_participants}/{selectedSession.max_participants} inscrits
                         </p>
                       </div>
@@ -1059,7 +1135,7 @@ export function WeeklyCalendar({
 
                     {/* Admin book for member */}
                     {!isPast(selectedSession) && adminMembers.length > 0 && (
-                      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 space-y-2">
+                      <div className={`border rounded-lg p-3 space-y-2 ${selectedSession.session_type === "duo" ? "bg-purple-500/5 border-purple-500/20" : "bg-[#1a1a1a] border-[#2a2a2a]"}`}>
                         <p className="text-xs font-medium text-gray-300">Inscrire un adhérent</p>
                         {adminBookingError && (
                           <p className="text-xs text-red-400">{adminBookingError}</p>
@@ -1073,7 +1149,9 @@ export function WeeklyCalendar({
                             <option value="">Choisir un adhérent...</option>
                             {adminMembers.map((m) => (
                               <option key={m.id} value={m.id}>
-                                {m.first_name} {m.last_name} ({m.collective_balance} séance{m.collective_balance !== 1 ? "s" : ""})
+                                {selectedSession.session_type === "duo"
+                                  ? `${m.first_name} ${m.last_name} (${m.duo_balance} séance${m.duo_balance !== 1 ? "s" : ""} duo)`
+                                  : `${m.first_name} ${m.last_name} (${m.collective_balance} séance${m.collective_balance !== 1 ? "s" : ""})`}
                               </option>
                             ))}
                           </select>

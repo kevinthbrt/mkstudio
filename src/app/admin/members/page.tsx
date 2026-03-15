@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Zap,
+  UserPlus,
   Mail,
   Phone,
   PlusCircle,
@@ -42,7 +43,7 @@ interface BookingWithDetails {
   cancelled_at: string | null;
   class_sessions: {
     start_time: string;
-    session_type: "collective" | "individual";
+    session_type: "collective" | "individual" | "duo";
     class_types: { name: string } | null;
   } | null;
 }
@@ -69,7 +70,7 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
 
   // Adjust balance state
-  const [adjustMode, setAdjustMode] = useState<"none" | "collective" | "individual" | "credit">("none");
+  const [adjustMode, setAdjustMode] = useState<"none" | "collective" | "individual" | "duo" | "credit">("none");
   const [adjustDelta, setAdjustDelta] = useState(1);
   const [adjusting, setAdjusting] = useState(false);
 
@@ -167,13 +168,15 @@ export default function MembersPage() {
   }
 
   // Direct balance adjustment (no invoice)
-  async function handleAdjustBalance(type: "collective" | "individual") {
+  async function handleAdjustBalance(type: "collective" | "individual" | "duo") {
     if (!selectedMember) return;
     setAdjusting(true);
 
-    const field = type === "individual" ? "individual_balance" : "collective_balance";
+    const field = type === "individual" ? "individual_balance" : type === "duo" ? "duo_balance" : "collective_balance";
     const current = type === "individual"
       ? selectedMember.individual_balance
+      : type === "duo"
+      ? selectedMember.duo_balance
       : selectedMember.collective_balance;
     const newBalance = Math.max(0, current + adjustDelta);
 
@@ -195,7 +198,7 @@ export default function MembersPage() {
   }
 
   // Credit without invoice via API
-  async function handleDirectCredit(type: "collective" | "individual") {
+  async function handleDirectCredit(type: "collective" | "individual" | "duo") {
     if (!selectedMember) return;
     setAdjusting(true);
 
@@ -211,7 +214,7 @@ export default function MembersPage() {
 
     if (res.ok) {
       const data = await res.json();
-      const field = type === "individual" ? "individual_balance" : "collective_balance";
+      const field = type === "individual" ? "individual_balance" : type === "duo" ? "duo_balance" : "collective_balance";
       const updated = { ...selectedMember, [field]: data.new_balance };
       setMembers((m) => m.map((mb) => (mb.id === selectedMember.id ? updated : mb)));
       setSelectedMember(updated);
@@ -332,6 +335,12 @@ export default function MembersPage() {
                       <Zap size={11} className="text-blue-400" />
                       <span className="text-blue-400 text-xs font-semibold">
                         {member.individual_balance}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <UserPlus size={11} className="text-purple-400" />
+                      <span className="text-purple-400 text-xs font-semibold">
+                        {member.duo_balance}
                       </span>
                     </div>
                   </div>
@@ -470,25 +479,35 @@ export default function MembersPage() {
             {/* Info tab */}
             {activeTab === "info" && (
               <>
-                {/* Two balances */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[#1a1a1a] rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users size={14} className="text-[#D4AF37]" />
-                      <p className="text-gray-400 text-xs">Solde collectif</p>
+                {/* Three balances */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-[#1a1a1a] rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Users size={12} className="text-[#D4AF37]" />
+                      <p className="text-gray-400 text-xs">Collectif</p>
                     </div>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-2xl font-bold text-white">
                       {selectedMember.collective_balance}
                     </p>
                     <p className="text-gray-600 text-xs mt-1">séances</p>
                   </div>
-                  <div className="bg-[#1a1a1a] rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap size={14} className="text-blue-400" />
-                      <p className="text-gray-400 text-xs">Solde individuel</p>
+                  <div className="bg-[#1a1a1a] rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Zap size={12} className="text-blue-400" />
+                      <p className="text-gray-400 text-xs">Solo</p>
                     </div>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-2xl font-bold text-white">
                       {selectedMember.individual_balance}
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1">séances</p>
+                  </div>
+                  <div className="bg-[#1a1a1a] rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <UserPlus size={12} className="text-purple-400" />
+                      <p className="text-gray-400 text-xs">Duo</p>
+                    </div>
+                    <p className="text-2xl font-bold text-white">
+                      {selectedMember.duo_balance}
                     </p>
                     <p className="text-gray-600 text-xs mt-1">séances</p>
                   </div>
@@ -529,7 +548,7 @@ export default function MembersPage() {
 
                 {/* Action buttons */}
                 {adjustMode === "none" && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -537,7 +556,7 @@ export default function MembersPage() {
                       onClick={() => { setAdjustMode("collective"); setAdjustDelta(1); }}
                     >
                       <Users size={14} />
-                      Ajuster collectif
+                      Collectif
                     </Button>
                     <Button
                       variant="outline"
@@ -546,12 +565,21 @@ export default function MembersPage() {
                       onClick={() => { setAdjustMode("individual"); setAdjustDelta(1); }}
                     >
                       <Zap size={14} />
-                      Ajuster individuel
+                      Solo
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-green-400 border-green-400/30 col-span-2"
+                      className="text-purple-400 border-purple-400/30"
+                      onClick={() => { setAdjustMode("duo"); setAdjustDelta(1); }}
+                    >
+                      <UserPlus size={14} />
+                      Duo
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-400 border-green-400/30 col-span-3"
                       onClick={() => { setAdjustMode("credit"); setAdjustDelta(1); }}
                     >
                       <Gift size={14} />
@@ -560,13 +588,13 @@ export default function MembersPage() {
                   </div>
                 )}
 
-                {/* Adjust collective/individual balance */}
-                {(adjustMode === "collective" || adjustMode === "individual") && (
+                {/* Adjust collective/individual/duo balance */}
+                {(adjustMode === "collective" || adjustMode === "individual" || adjustMode === "duo") && (
                   <div className="bg-[#1a1a1a] rounded-xl p-4 space-y-3">
                     <p className="text-sm text-gray-300 font-medium">
                       Ajustement du solde{" "}
-                      <span className={adjustMode === "individual" ? "text-blue-400" : "text-[#D4AF37]"}>
-                        {adjustMode === "individual" ? "individuel" : "collectif"}
+                      <span className={adjustMode === "individual" ? "text-blue-400" : adjustMode === "duo" ? "text-purple-400" : "text-[#D4AF37]"}>
+                        {adjustMode === "individual" ? "solo" : adjustMode === "duo" ? "duo" : "collectif"}
                       </span>
                     </p>
                     <div className="flex items-center gap-3">
@@ -587,6 +615,8 @@ export default function MembersPage() {
                             0,
                             (adjustMode === "individual"
                               ? selectedMember.individual_balance
+                              : adjustMode === "duo"
+                              ? selectedMember.duo_balance
                               : selectedMember.collective_balance) + adjustDelta
                           )}
                         </p>
@@ -610,7 +640,7 @@ export default function MembersPage() {
                       <Button
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleAdjustBalance(adjustMode as "collective" | "individual")}
+                        onClick={() => handleAdjustBalance(adjustMode as "collective" | "individual" | "duo")}
                         loading={adjusting}
                       >
                         Confirmer
@@ -644,7 +674,7 @@ export default function MembersPage() {
                         <PlusCircle size={18} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -663,7 +693,17 @@ export default function MembersPage() {
                         loading={adjusting}
                       >
                         <Zap size={12} />
-                        Individuel
+                        Solo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-purple-400 border-purple-400/30"
+                        onClick={() => handleDirectCredit("duo")}
+                        loading={adjusting}
+                      >
+                        <UserPlus size={12} />
+                        Duo
                       </Button>
                     </div>
                     <Button
@@ -711,6 +751,9 @@ export default function MembersPage() {
                                 : (item.data as BookingWithDetails).class_sessions
                                     ?.session_type === "individual"
                                 ? "bg-blue-500/10 border border-blue-500/30"
+                                : (item.data as BookingWithDetails).class_sessions
+                                    ?.session_type === "duo"
+                                ? "bg-purple-500/10 border border-purple-500/30"
                                 : "bg-green-500/10 border border-green-500/30"
                             }`}
                           >
@@ -721,6 +764,9 @@ export default function MembersPage() {
                             ) : (item.data as BookingWithDetails).class_sessions
                                 ?.session_type === "individual" ? (
                               <Zap size={12} className="text-blue-400" />
+                            ) : (item.data as BookingWithDetails).class_sessions
+                                ?.session_type === "duo" ? (
+                              <UserPlus size={12} className="text-purple-400" />
                             ) : (
                               <Users size={12} className="text-green-400" />
                             )}
@@ -769,7 +815,9 @@ function AdminPurchaseRow({ order }: { order: OrderWithProduct }) {
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <span className="text-xs text-gray-400">+{order.sessions_purchased} séance(s)</span>
             {order.products?.session_type === "individual" ? (
-              <Badge variant="blue">Individuel</Badge>
+              <Badge variant="blue">Solo</Badge>
+            ) : order.products?.session_type === "duo" ? (
+              <Badge variant="purple">Duo</Badge>
             ) : (
               <Badge variant="gold">Collectif</Badge>
             )}
@@ -787,6 +835,7 @@ function AdminPurchaseRow({ order }: { order: OrderWithProduct }) {
 function AdminBookingRow({ booking }: { booking: BookingWithDetails }) {
   const session = booking.class_sessions;
   const isIndividual = session?.session_type === "individual";
+  const isDuo = session?.session_type === "duo";
   const isCancelled = booking.status === "cancelled";
 
   return (
@@ -796,6 +845,8 @@ function AdminBookingRow({ booking }: { booking: BookingWithDetails }) {
           ? "bg-red-500/5 border-red-500/20"
           : isIndividual
           ? "bg-blue-500/5 border-blue-500/20"
+          : isDuo
+          ? "bg-purple-500/5 border-purple-500/20"
           : "bg-[#111111] border-[#1f1f1f]"
       }`}
     >
@@ -828,7 +879,9 @@ function AdminBookingRow({ booking }: { booking: BookingWithDetails }) {
           )}
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             {isIndividual ? (
-              <Badge variant="blue">Individuel</Badge>
+              <Badge variant="blue">Solo</Badge>
+            ) : isDuo ? (
+              <Badge variant="purple">Duo</Badge>
             ) : (
               <Badge variant="gold">Collectif</Badge>
             )}

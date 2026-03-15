@@ -7,7 +7,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Card } from "@/components/ui/Card";
-import { Plus, Package, Edit, Trash2, Zap, Users } from "lucide-react";
+import { Plus, Package, Edit, Trash2, Zap, Users, UserPlus } from "lucide-react";
 import { formatPriceFromEuros } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -24,7 +24,7 @@ export default function ProductsPage() {
     description: "",
     price: "",
     session_count: "",
-    session_type: "collective" as "collective" | "individual",
+    session_type: "collective" as "collective" | "individual" | "duo",
     active: true,
   });
 
@@ -44,7 +44,7 @@ export default function ProductsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: "", description: "", price: "", session_count: "", session_type: "collective", active: true });
+    setForm({ name: "", description: "", price: "", session_count: "", session_type: "collective" as "collective" | "individual" | "duo", active: true });
     setShowModal(true);
   }
 
@@ -133,16 +133,20 @@ export default function ProductsPage() {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                   product.session_type === "individual"
                     ? "bg-blue-500/10 border border-blue-500/20"
+                    : product.session_type === "duo"
+                    ? "bg-purple-500/10 border border-purple-500/20"
                     : "bg-[#D4AF37]/10 border border-[#D4AF37]/20"
                 }`}>
                   {product.session_type === "individual"
                     ? <Zap size={18} className="text-blue-400" />
+                    : product.session_type === "duo"
+                    ? <UserPlus size={18} className="text-purple-400" />
                     : <Users size={18} className="text-[#D4AF37]" />
                   }
                 </div>
                 <div className="flex gap-1.5">
-                  <Badge variant={product.session_type === "individual" ? "blue" : "gray"}>
-                    {product.session_type === "individual" ? "Individuel" : "Collectif"}
+                  <Badge variant={product.session_type === "individual" ? "blue" : product.session_type === "duo" ? "purple" : "gray"}>
+                    {product.session_type === "individual" ? "Solo" : product.session_type === "duo" ? "Duo" : "Collectif"}
                   </Badge>
                   <Badge variant={product.active ? "green" : "red"}>
                     {product.active ? "Actif" : "Inactif"}
@@ -243,7 +247,7 @@ export default function ProductsPage() {
 
           <div>
             <p className="text-sm font-medium text-gray-300 mb-2">Type de séances</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setForm({ ...form, session_type: "collective" })}
@@ -264,7 +268,18 @@ export default function ProductsPage() {
                     : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
                 }`}
               >
-                Individuel
+                Solo
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, session_type: "duo" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  form.session_type === "duo"
+                    ? "bg-purple-500/10 border-purple-500/40 text-purple-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Duo
               </button>
             </div>
           </div>

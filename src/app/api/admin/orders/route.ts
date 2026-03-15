@@ -87,6 +87,16 @@ export async function POST(request: NextRequest) {
         .from("profiles")
         .update({ individual_balance: member.individual_balance + product.session_count })
         .eq("id", member_id);
+    } else if (sessionType === "duo") {
+      const { data: memberDuo } = await supabase
+        .from("profiles")
+        .select("duo_balance")
+        .eq("id", member_id)
+        .single();
+      await supabase
+        .from("profiles")
+        .update({ duo_balance: (memberDuo?.duo_balance ?? 0) + product.session_count })
+        .eq("id", member_id);
     } else {
       await supabase
         .from("profiles")

@@ -14,6 +14,7 @@ import {
   Users,
   Zap,
   XCircle,
+  UserPlus,
 } from "lucide-react";
 import { formatDate, formatPriceFromEuros } from "@/lib/utils";
 import type { Profile } from "@/types/database";
@@ -38,7 +39,7 @@ interface BookingWithDetails {
   class_sessions: {
     start_time: string;
     end_time: string;
-    session_type: "collective" | "individual";
+    session_type: "collective" | "individual" | "duo";
     class_types: { name: string } | null;
   } | null;
 }
@@ -50,7 +51,7 @@ type HistoryItem =
 export default function PurchasesPage() {
   const [orders, setOrders] = useState<OrderWithProduct[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [profile, setProfile] = useState<Pick<Profile, "collective_balance" | "individual_balance"> | null>(null);
+  const [profile, setProfile] = useState<Pick<Profile, "collective_balance" | "individual_balance" | "duo_balance"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "history">("invoices");
@@ -68,7 +69,7 @@ export default function PurchasesPage() {
 
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("id, collective_balance, individual_balance")
+      .select("id, collective_balance, individual_balance, duo_balance")
       .eq("user_id", user.id)
       .single();
 
@@ -154,16 +155,20 @@ export default function PurchasesPage() {
       </div>
 
       {/* Remaining sessions */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Card className="p-4">
-          <p className="text-gray-400 text-xs mb-1">Séances collectives restantes</p>
+          <p className="text-gray-400 text-xs mb-1">Collectives</p>
           <p className="text-2xl font-bold text-[#D4AF37]">
             {profile?.collective_balance ?? 0}
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-gray-400 text-xs mb-1">Séances individuelles restantes</p>
-          <p className="text-2xl font-bold text-white">{profile?.individual_balance ?? 0}</p>
+          <p className="text-gray-400 text-xs mb-1">Individuelles</p>
+          <p className="text-2xl font-bold text-blue-400">{profile?.individual_balance ?? 0}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-gray-400 text-xs mb-1">Duo</p>
+          <p className="text-2xl font-bold text-purple-400">{profile?.duo_balance ?? 0}</p>
         </Card>
       </div>
 
@@ -224,6 +229,8 @@ export default function PurchasesPage() {
                           </span>
                           {order.products?.session_type === "individual" ? (
                             <Badge variant="blue">Individuel</Badge>
+                          ) : order.products?.session_type === "duo" ? (
+                            <Badge variant="purple">Duo</Badge>
                           ) : (
                             <Badge variant="gold">Collectif</Badge>
                           )}
@@ -278,6 +285,9 @@ export default function PurchasesPage() {
                           : (item.data as BookingWithDetails).class_sessions
                               ?.session_type === "individual"
                           ? "bg-blue-500/10 border border-blue-500/30"
+                          : (item.data as BookingWithDetails).class_sessions
+                              ?.session_type === "duo"
+                          ? "bg-purple-500/10 border border-purple-500/30"
                           : "bg-green-500/10 border border-green-500/30"
                       }`}
                     >
@@ -288,6 +298,9 @@ export default function PurchasesPage() {
                       ) : (item.data as BookingWithDetails).class_sessions
                           ?.session_type === "individual" ? (
                         <Zap size={14} className="text-blue-400" />
+                      ) : (item.data as BookingWithDetails).class_sessions
+                          ?.session_type === "duo" ? (
+                        <UserPlus size={14} className="text-purple-400" />
                       ) : (
                         <Users size={14} className="text-green-400" />
                       )}
@@ -342,6 +355,8 @@ function PurchaseHistoryRow({
             </span>
             {order.products?.session_type === "individual" ? (
               <Badge variant="blue">Individuel</Badge>
+            ) : order.products?.session_type === "duo" ? (
+              <Badge variant="purple">Duo</Badge>
             ) : (
               <Badge variant="gold">Collectif</Badge>
             )}
@@ -368,6 +383,7 @@ function PurchaseHistoryRow({
 function BookingHistoryRow({ booking }: { booking: BookingWithDetails }) {
   const session = booking.class_sessions;
   const isIndividual = session?.session_type === "individual";
+  const isDuo = session?.session_type === "duo";
   const isCancelled = booking.status === "cancelled";
 
   return (
@@ -377,6 +393,8 @@ function BookingHistoryRow({ booking }: { booking: BookingWithDetails }) {
           ? "bg-red-500/5 border-red-500/20"
           : isIndividual
           ? "bg-blue-500/5 border-blue-500/20"
+          : isDuo
+          ? "bg-purple-500/5 border-purple-500/20"
           : "bg-[#111111] border-[#1f1f1f]"
       }`}
     >
@@ -393,6 +411,8 @@ function BookingHistoryRow({ booking }: { booking: BookingWithDetails }) {
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {isIndividual ? (
               <Badge variant="blue">Individuel</Badge>
+            ) : isDuo ? (
+              <Badge variant="purple">Duo</Badge>
             ) : (
               <Badge variant="gold">Collectif</Badge>
             )}

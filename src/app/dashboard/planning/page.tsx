@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { WeeklyCalendar } from "@/components/planning/WeeklyCalendar";
-import { Zap, Users } from "lucide-react";
+import { Zap, Users, UserPlus } from "lucide-react";
 
 export default function MemberPlanningPage() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function MemberPlanningPage() {
   const [memberFirstName, setMemberFirstName] = useState("");
   const [collectiveBalance, setCollectiveBalance] = useState(0);
   const [individualBalance, setIndividualBalance] = useState(0);
+  const [duoBalance, setDuoBalance] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -23,7 +24,7 @@ export default function MemberPlanningPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, collective_balance, individual_balance, first_name, email")
+        .select("id, collective_balance, individual_balance, duo_balance, first_name, email")
         .eq("user_id", user.id)
         .single();
 
@@ -33,6 +34,7 @@ export default function MemberPlanningPage() {
       setMemberFirstName(profile.first_name ?? "");
       setCollectiveBalance(profile.collective_balance);
       setIndividualBalance(profile.individual_balance);
+      setDuoBalance(profile.duo_balance ?? 0);
       setLoading(false);
     }
     load();
@@ -70,6 +72,13 @@ export default function MemberPlanningPage() {
               <p className="text-gray-500 text-xs">individuel</p>
             </div>
           </div>
+          <div className="flex items-center gap-2 bg-[#111111] border border-purple-500/20 rounded-xl px-3 py-2">
+            <UserPlus size={14} className="text-purple-400" />
+            <div>
+              <p className="text-purple-400 font-bold text-sm">{duoBalance}</p>
+              <p className="text-gray-500 text-xs">duo</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -87,9 +96,11 @@ export default function MemberPlanningPage() {
         memberFirstName={memberFirstName}
         collectiveBalance={collectiveBalance}
         individualBalance={individualBalance}
-        onBalanceChange={(c, i) => {
+        duoBalance={duoBalance}
+        onBalanceChange={(c, i, d) => {
           setCollectiveBalance(c);
           setIndividualBalance(i);
+          setDuoBalance(d);
         }}
       />
     </div>

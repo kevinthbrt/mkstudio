@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui/Card";
-import { Zap, Calendar, Users, TrendingUp, ArrowRight } from "lucide-react";
+import { Zap, Calendar, Users, TrendingUp, ArrowRight, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
@@ -83,23 +83,23 @@ export default async function MemberDashboard() {
           color="blue"
         />
         <StatCard
+          title="Séances duo"
+          value={profile.duo_balance ?? 0}
+          subtitle="disponibles"
+          icon={<UserPlus size={18} />}
+          color="purple"
+        />
+        <StatCard
           title="Cours à venir"
           value={upcomingBookings?.length || 0}
           subtitle="prochains cours"
           icon={<Calendar size={18} />}
           color="green"
         />
-        <StatCard
-          title="Total réservations"
-          value={totalBookings || 0}
-          subtitle="depuis l'inscription"
-          icon={<TrendingUp size={18} />}
-          color="purple"
-        />
       </div>
 
       {/* Low balance warning */}
-      {profile.collective_balance === 0 && profile.individual_balance === 0 && (
+      {profile.collective_balance === 0 && profile.individual_balance === 0 && (profile.duo_balance ?? 0) === 0 && (
         <div className="rounded-2xl p-4 flex items-start gap-3"
           style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
         >
@@ -137,6 +137,7 @@ export default async function MemberDashboard() {
               const session = booking.class_sessions as any;
               if (!session) return null;
               const isIndividual = session.session_type === "individual";
+              const isDuo = session.session_type === "duo";
               return (
                 <div
                   key={booking.id}
@@ -167,6 +168,7 @@ export default async function MemberDashboard() {
                   <div className="flex flex-col gap-1 items-end flex-shrink-0">
                     <Badge variant="green">Confirmé</Badge>
                     {isIndividual && <Badge variant="blue">Individuel</Badge>}
+                    {isDuo && <Badge variant="purple">Duo</Badge>}
                   </div>
                 </div>
               );

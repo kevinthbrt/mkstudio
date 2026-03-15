@@ -20,6 +20,7 @@ export interface Database {
           role: "admin" | "member";
           collective_balance: number;
           individual_balance: number;
+          duo_balance: number;
           legal_status: string | null;
           created_at: string;
           updated_at: string;
@@ -34,6 +35,7 @@ export interface Database {
           role?: "admin" | "member";
           collective_balance?: number;
           individual_balance?: number;
+          duo_balance?: number;
           legal_status?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -48,6 +50,7 @@ export interface Database {
           role?: "admin" | "member";
           collective_balance?: number;
           individual_balance?: number;
+          duo_balance?: number;
           legal_status?: string | null;
           updated_at?: string;
         };
@@ -60,7 +63,7 @@ export interface Database {
           description: string | null;
           price: number;
           session_count: number;
-          session_type: "collective" | "individual";
+          session_type: "collective" | "individual" | "duo";
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -231,7 +234,7 @@ export interface Database {
           is_cancelled: boolean;
           is_hidden: boolean;
           recurring_rule: string | null;
-          session_type: "collective" | "individual";
+          session_type: "collective" | "individual" | "duo";
           assigned_member_id: string | null;
           created_at: string;
         };
@@ -338,6 +341,14 @@ export interface Database {
         Returns: undefined;
       };
       decrement_individual_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      increment_duo_balance: {
+        Args: { p_member_id: string };
+        Returns: undefined;
+      };
+      decrement_duo_balance: {
         Args: { p_member_id: string };
         Returns: undefined;
       };
