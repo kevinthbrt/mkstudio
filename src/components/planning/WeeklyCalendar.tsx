@@ -166,18 +166,25 @@ export function WeeklyCalendar({
 
   async function loadSessionBookees(sessionId: string) {
     setLoadingBookees(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("class_bookings")
-      .select("guest_names, profiles (first_name, last_name)")
-      .eq("class_session_id", sessionId)
-      .eq("status", "confirmed");
-    setSessionBookees(
-      ((data as any[]) || []).map((b) => ({
-        name: `${b.profiles?.first_name ?? ""} ${b.profiles?.last_name ?? ""}`.trim(),
-        guest_names: b.guest_names,
-      }))
-    );
+    if (isAdmin) {
+      // Use server-side API route (service role) to avoid RLS recursion
+      const res = await fetch(`/api/admin/sessions/bookees?session_id=${sessionId}`);
+      const data = await res.json();
+      setSessionBookees(Array.isArray(data) ? data : []);
+    } else {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("class_bookings")
+        .select("guest_names, profiles (first_name, last_name)")
+        .eq("class_session_id", sessionId)
+        .eq("status", "confirmed");
+      setSessionBookees(
+        ((data as any[]) || []).map((b) => ({
+          name: `${b.profiles?.first_name ?? ""} ${b.profiles?.last_name ?? ""}`.trim(),
+          guest_names: b.guest_names,
+        }))
+      );
+    }
     setLoadingBookees(false);
   }
 
@@ -493,8 +500,8 @@ export function WeeklyCalendar({
                           {session.coach_name}
                         </p>
                         {!isIndividual && (
-                          <p className="text-gray-600 text-xs mt-0.5">
-                            {session.current_participants}/{session.max_participants} places
+                          <p className={`text-xs mt-0.5 ${isFull ? "text-red-400" : isAdmin ? "text-gray-400 font-medium" : "text-gray-600"}`}>
+                            {session.current_participants}/{session.max_participants} inscrits
                             {isFull && " · Complet"}
                           </p>
                         )}
@@ -589,7 +596,12 @@ export function WeeklyCalendar({
                               : "Individuel"}
                           </p>
                         )}
-                        {isBooked && (
+                        {isAdmin && !isIndividual && (
+                          <p className={`text-xs mt-0.5 font-medium ${session.current_participants >= session.max_participants ? "text-red-400" : "text-gray-400"}`}>
+                            {session.current_participants}/{session.max_participants}
+                          </p>
+                        )}
+                        {!isAdmin && isBooked && (
                           <div className="mt-1">
                             <Badge variant="green">✓</Badge>
                           </div>
