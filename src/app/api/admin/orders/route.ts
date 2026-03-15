@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPurchaseConfirmationEmail } from "@/lib/email";
+import { notifyMember } from "@/lib/notifyMember";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -118,6 +119,12 @@ export async function POST(request: NextRequest) {
           orderId: order.id,
         });
       }
+      notifyMember(
+        member.user_id,
+        "Achat confirmé — " + product.name,
+        `${product.session_count} séance${product.session_count > 1 ? "s" : ""} créditée${product.session_count > 1 ? "s" : ""} sur ton solde. Facture disponible.`,
+        `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard/purchases`
+      );
     } catch (err) {
       console.error("[admin/orders] email error:", err);
     }

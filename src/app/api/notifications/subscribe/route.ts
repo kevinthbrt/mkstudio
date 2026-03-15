@@ -9,16 +9,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    return NextResponse.json({ error: "Réservé aux administrateurs" }, { status: 403 });
-  }
-
   const body = await request.json();
   const { subscription } = body;
 

@@ -132,9 +132,7 @@ export function Sidebar({ role, userName }: SidebarProps) {
 // Mobile bottom navigation
 export function BottomNav({ role }: { role: "admin" | "member" }) {
   const pathname = usePathname();
-  const nav = role === "admin"
-    ? adminNav.slice(0, 5)
-    : memberNav.slice(0, 5);
+  const nav = role === "admin" ? adminNav : memberNav.slice(0, 5);
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 safe-bottom"
