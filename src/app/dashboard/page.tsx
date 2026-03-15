@@ -5,6 +5,7 @@ import { Zap, Calendar, Users, TrendingUp, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
+import { NotificationBanner } from "@/components/NotificationBanner";
 
 export default async function MemberDashboard() {
   const supabase = await createClient();
@@ -62,6 +63,8 @@ export default async function MemberDashboard() {
           Votre espace personnel MK Studio
         </p>
       </div>
+
+      <NotificationBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">

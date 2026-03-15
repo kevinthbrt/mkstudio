@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendIndividualSessionBookingEmail } from "@/lib/email";
+import { notifyMember } from "@/lib/notifyMember";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -50,6 +51,13 @@ export async function POST(request: NextRequest) {
         recurring: recurring ?? false,
       });
     }
+
+    notifyMember(
+      member.user_id,
+      `Séance planifiée — ${sessionName}`,
+      `${sessionDate} à ${sessionTime} avec ${coachName}`,
+      `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
+    );
 
     return NextResponse.json({ success: true });
   } catch (err) {
