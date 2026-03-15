@@ -11,6 +11,14 @@ function escapeHtml(str: string | null | undefined): string {
     .replace(/'/g, "&#039;");
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  especes: "Espèces",
+  virement: "Virement bancaire",
+  cheque: "Chèque",
+  carte: "Carte bancaire",
+  helloasso: "HelloAsso",
+};
+
 function generateInvoiceHTML(
   order: any,
   member: any,
@@ -214,10 +222,19 @@ function generateInvoiceHTML(
     @media print {
       body { background: white; }
       .page { padding: 40px; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
+  <div class="no-print" style="position:fixed;top:16px;right:16px;z-index:100;display:flex;gap:8px;">
+    <button onclick="window.print()" style="background:#D4AF37;color:#000;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">
+      ⬇ Télécharger PDF
+    </button>
+    <button onclick="window.close()" style="background:#1a1a1a;color:#888;border:1px solid #333;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">
+      ✕ Fermer
+    </button>
+  </div>
   <div class="page">
     <!-- Header -->
     <div class="header">
@@ -249,6 +266,7 @@ function generateInvoiceHTML(
       <div class="party-block">
         <h3>Client</h3>
         <p class="name">${escapeHtml(member.first_name)} ${escapeHtml(member.last_name)}</p>
+        ${member.legal_status ? `<p>${escapeHtml(member.legal_status)}</p>` : ""}
         <p>Email : ${escapeHtml(member.email)}</p>
         ${member.phone ? `<p>Tél : ${escapeHtml(member.phone)}</p>` : ""}
       </div>
@@ -310,6 +328,7 @@ function generateInvoiceHTML(
 
       <div class="legal-text">
         <strong>Conditions de paiement :</strong> ${escapeHtml(settings.payment_terms)}<br>
+        ${order.payment_method ? `<strong>Mode de paiement :</strong> ${escapeHtml(PAYMENT_METHOD_LABELS[order.payment_method] ?? order.payment_method)}<br>` : ""}
         Date de réalisation de la prestation : ${formattedDate}<br>
       </div>
       <div class="penalty-text">
@@ -317,6 +336,12 @@ function generateInvoiceHTML(
         ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €
         (art. L441-10 et D441-5 du Code de commerce).
       </div>
+
+      ${settings.stamp_url ? `
+      <div style="margin-top:24px;text-align:right;">
+        <img src="${escapeHtml(settings.stamp_url)}" alt="Tampon" style="max-height:100px;max-width:200px;opacity:0.85;" />
+      </div>
+      ` : ""}
     </div>
   </div>
 </body>
@@ -392,6 +417,7 @@ export async function GET(
     next_invoice_number: 1,
     logo_url: null,
     bank_details: null,
+    stamp_url: null,
   };
 
   const html = generateInvoiceHTML(order, member, product, effectiveSettings);
@@ -399,7 +425,6 @@ export async function GET(
   return new NextResponse(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": `attachment; filename="facture-${order.invoice_number}.html"`,
     },
   });
 }

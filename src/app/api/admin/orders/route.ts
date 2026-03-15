@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { member_id, product_id } = body;
+  const { member_id, product_id, payment_method } = body;
 
   if (!member_id || !product_id) {
     return NextResponse.json(
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       sessions_purchased: product.session_count,
       invoice_number: invoiceNumber,
       status: "paid",
+      payment_method: payment_method || null,
       paid_at: new Date().toISOString(),
     })
     .select()

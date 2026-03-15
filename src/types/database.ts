@@ -20,6 +20,7 @@ export interface Database {
           role: "admin" | "member";
           collective_balance: number;
           individual_balance: number;
+          legal_status: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -33,6 +34,7 @@ export interface Database {
           role?: "admin" | "member";
           collective_balance?: number;
           individual_balance?: number;
+          legal_status?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -46,6 +48,7 @@ export interface Database {
           role?: "admin" | "member";
           collective_balance?: number;
           individual_balance?: number;
+          legal_status?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -94,6 +97,7 @@ export interface Database {
           sessions_purchased: number;
           invoice_number: string;
           status: "pending" | "paid" | "cancelled";
+          payment_method: string | null;
           created_at: string;
           paid_at: string | null;
         };
@@ -105,6 +109,7 @@ export interface Database {
           sessions_purchased: number;
           invoice_number?: string;
           status?: "pending" | "paid" | "cancelled";
+          payment_method?: string | null;
           created_at?: string;
           paid_at?: string | null;
         };
@@ -116,6 +121,7 @@ export interface Database {
           sessions_purchased?: number;
           invoice_number?: string;
           status?: "pending" | "paid" | "cancelled";
+          payment_method?: string | null;
           paid_at?: string | null;
         };
         Relationships: [];
@@ -139,6 +145,7 @@ export interface Database {
           next_invoice_number: number;
           logo_url: string | null;
           bank_details: string | null;
+          stamp_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -160,6 +167,7 @@ export interface Database {
           next_invoice_number?: number;
           logo_url?: string | null;
           bank_details?: string | null;
+          stamp_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -180,6 +188,7 @@ export interface Database {
           next_invoice_number?: number;
           logo_url?: string | null;
           bank_details?: string | null;
+          stamp_url?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -265,6 +274,7 @@ export interface Database {
           class_session_id: string;
           status: "confirmed" | "cancelled";
           session_debited: boolean;
+          guest_names: string | null;
           booked_at: string;
           cancelled_at: string | null;
         };
@@ -274,12 +284,14 @@ export interface Database {
           class_session_id: string;
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
+          guest_names?: string | null;
           booked_at?: string;
           cancelled_at?: string | null;
         };
         Update: {
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
+          guest_names?: string | null;
           cancelled_at?: string | null;
         };
         Relationships: [];

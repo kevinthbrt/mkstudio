@@ -16,10 +16,19 @@ interface OrderWithDetails {
   sessions_purchased: number;
   invoice_number: string;
   status: string;
+  payment_method: string | null;
   created_at: string;
   profiles: { first_name: string; last_name: string };
   products: { name: string; session_type: string };
 }
+
+const PAYMENT_METHODS = [
+  { value: "especes", label: "Espèces" },
+  { value: "virement", label: "Virement bancaire" },
+  { value: "cheque", label: "Chèque" },
+  { value: "carte", label: "Carte bancaire" },
+  { value: "helloasso", label: "HelloAsso" },
+];
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -28,8 +37,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [showSell, setShowSell] = useState(false);
   const [selling, setSelling] = useState(false);
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ member_id: "", product_id: "" });
+  const [form, setForm] = useState({ member_id: "", product_id: "", payment_method: "" });
   const [sellError, setSellError] = useState("");
 
   useEffect(() => {
@@ -69,32 +77,14 @@ export default function OrdersPage() {
       setSellError(data.error || "Erreur lors de la vente");
     } else {
       setShowSell(false);
-      setForm({ member_id: "", product_id: "" });
+      setForm({ member_id: "", product_id: "", payment_method: "" });
       loadData();
     }
     setSelling(false);
   }
 
-  async function downloadInvoice(orderId: string) {
-    setGeneratingId(orderId);
-    try {
-      const res = await fetch(`/api/invoices/${orderId}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        const order = orders.find((o) => o.id === orderId);
-        a.download = `facture-${order?.invoice_number || orderId}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-    setGeneratingId(null);
+  function downloadInvoice(orderId: string) {
+    window.open(`/api/invoices/${orderId}`, "_blank");
   }
 
   const totalRevenue = orders.reduce((sum, o) => sum + o.amount, 0);
@@ -157,6 +147,9 @@ export default function OrdersPage() {
                   </p>
                   <p className="text-gray-600 text-xs mt-0.5">
                     {order.invoice_number} — {formatDate(order.created_at)}
+                    {order.payment_method && (
+                      <> — {PAYMENT_METHODS.find(m => m.value === order.payment_method)?.label ?? order.payment_method}</>
+                    )}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
@@ -175,7 +168,6 @@ export default function OrdersPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => downloadInvoice(order.id)}
-                    loading={generatingId === order.id}
                     className="text-xs"
                   >
                     <Download size={12} />
@@ -288,6 +280,32 @@ export default function OrdersPage() {
             )}
           </div>
 
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-gray-300">Mode de paiement</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {PAYMENT_METHODS.map((m) => (
+                <label
+                  key={m.value}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    form.payment_method === m.value
+                      ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-white"
+                      : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a] text-gray-400"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value={m.value}
+                    checked={form.payment_method === m.value}
+                    onChange={() => setForm({ ...form, payment_method: m.value })}
+                    className="accent-[#D4AF37]"
+                  />
+                  <span className="text-sm">{m.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {selectedProduct && (
             <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#2a2a2a]">
               <div className="flex items-center justify-between">
@@ -329,7 +347,7 @@ export default function OrdersPage() {
             >
               Annuler
             </Button>
-            <Button type="submit" loading={selling} className="flex-1" disabled={!form.member_id || !form.product_id}>
+            <Button type="submit" loading={selling} className="flex-1" disabled={!form.member_id || !form.product_id || !form.payment_method}>
               Valider la vente
             </Button>
           </div>
