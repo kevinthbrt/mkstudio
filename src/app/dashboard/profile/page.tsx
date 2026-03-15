@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { User, Phone, Mail, Save, CheckCircle, Users, Zap } from "lucide-react";
+import { PushNotificationSetup } from "@/components/PushNotificationSetup";
 import type { Profile } from "@/types/database";
 
 export default function ProfilePage() {
@@ -123,6 +124,17 @@ export default function ProfilePage() {
           <p className="text-gray-600 text-xs mt-0.5">séances</p>
         </Card>
       </div>
+
+      {/* Push notifications */}
+      <Card className="p-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">Notifications push</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Rappel 24h et 1h avant vos cours, confirmation d&apos;achat
+          </p>
+        </div>
+        <PushNotificationSetup />
+      </Card>
 
       {/* Edit form */}
       <Card className="p-5">

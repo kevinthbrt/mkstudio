@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPurchaseConfirmationEmail } from "@/lib/email";
+import { notifyMember } from "@/lib/notifyMember";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -101,12 +102,13 @@ export async function POST(request: NextRequest) {
       .eq("id", invoiceSettings.id);
   }
 
-  // Send purchase confirmation email to member (non-blocking)
+  // Send purchase confirmation email to member
   if (member?.user_id) {
-    const adminClient = createAdminClient();
-    adminClient.auth.admin.getUserById(member.user_id).then(({ data: authUser }) => {
+    try {
+      const adminClient = createAdminClient();
+      const { data: authUser } = await adminClient.auth.admin.getUserById(member.user_id);
       if (authUser?.user?.email) {
-        sendPurchaseConfirmationEmail({
+        await sendPurchaseConfirmationEmail({
           to: authUser.user.email,
           firstName: member.first_name ?? "",
           productName: product.name,
@@ -115,9 +117,17 @@ export async function POST(request: NextRequest) {
           sessionType: product.session_type ?? "collective",
           invoiceNumber,
           orderId: order.id,
-        }).catch((err) => console.error("[admin/orders] email error:", err));
+        });
       }
-    }).catch(() => {});
+      notifyMember(
+        member.user_id,
+        "Achat confirmé — " + product.name,
+        `${product.session_count} séance${product.session_count > 1 ? "s" : ""} créditée${product.session_count > 1 ? "s" : ""} sur ton solde. Facture disponible.`,
+        `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard/purchases`
+      );
+    } catch (err) {
+      console.error("[admin/orders] email error:", err);
+    }
   }
 
   return NextResponse.json({

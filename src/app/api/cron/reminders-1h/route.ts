@@ -1,7 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendSessionReminderEmail } from "@/lib/email";
 import { notifyMember } from "@/lib/notifyMember";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatTime } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -13,10 +12,10 @@ export async function GET(request: NextRequest) {
 
   const adminClient = createAdminClient();
 
-  // Find sessions starting in 23–25h from now
+  // Find sessions starting in 55–65 minutes from now
   const now = new Date();
-  const from = new Date(now.getTime() + 23 * 60 * 60 * 1000);
-  const to = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+  const from = new Date(now.getTime() + 55 * 60 * 1000);
+  const to = new Date(now.getTime() + 65 * 60 * 1000);
 
   const { data: sessions, error: sessionsError } = await adminClient
     .from("class_sessions")
@@ -34,10 +33,9 @@ export async function GET(request: NextRequest) {
   for (const session of sessions) {
     const sessionTyped = session as typeof session & { class_types: { name: string } };
 
-    // Get all confirmed bookings for this session with member profiles
     const { data: bookings } = await adminClient
       .from("class_bookings")
-      .select("member_id, profiles (first_name, email, user_id)")
+      .select("member_id, profiles (first_name, user_id)")
       .eq("class_session_id", session.id)
       .eq("status", "confirmed");
 
@@ -45,31 +43,15 @@ export async function GET(request: NextRequest) {
 
     for (const booking of bookings) {
       const profile = (booking as any).profiles;
-      if (!profile?.email) continue;
+      if (!profile?.user_id) continue;
 
-      try {
-        await sendSessionReminderEmail({
-          to: profile.email,
-          firstName: profile.first_name ?? "",
-          sessionName: sessionTyped.class_types.name,
-          sessionDate: formatDate(session.start_time),
-          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
-          coachName: session.coach_name,
-        });
-        sent++;
-      } catch (err) {
-        console.error("[cron/reminders] email error:", err);
-      }
-
-      // Push notification (non-blocking)
-      if (profile.user_id) {
-        notifyMember(
-          profile.user_id,
-          `Rappel — ${sessionTyped.class_types.name} demain`,
-          `Ton cours est demain à ${formatTime(session.start_time)} avec ${session.coach_name}`,
-          `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
-        );
-      }
+      notifyMember(
+        profile.user_id,
+        `Dans 1h — ${sessionTyped.class_types.name}`,
+        `Ton cours commence à ${formatTime(session.start_time)} avec ${session.coach_name}`,
+        `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
+      );
+      sent++;
     }
   }
 

@@ -1,4 +1,5 @@
 import { BottomNav, MobileHeader, Sidebar } from "./Sidebar";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import type { Profile } from "@/types/database";
 
 interface DashboardLayoutProps {
@@ -20,6 +21,7 @@ export function DashboardLayout({ children, profile, title }: DashboardLayoutPro
       </main>
 
       <BottomNav role={profile.role} />
+      <PWAInstallPrompt />
     </div>
   );
 }

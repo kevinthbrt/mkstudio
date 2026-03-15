@@ -180,6 +180,24 @@ export default function AdminPlanningPage() {
           p_member_id: sessionForm.assigned_member_id,
         });
       }
+
+      // Send booking confirmation email to member
+      const sessionName = classTypes.find((t) => t.id === sessionForm.class_type_id)?.name ?? "Séance individuelle";
+      const dateObj = new Date(`${sessionForm.date}T${sessionForm.start_hour}:00`);
+      const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const sessionTime = `${sessionForm.start_hour} – ${sessionForm.end_hour}`;
+      fetch("/api/admin/emails/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: sessionForm.assigned_member_id,
+          sessionName,
+          sessionDate,
+          sessionTime,
+          coachName: sessionForm.coach_name,
+          recurring: sessionForm.recurring,
+        }),
+      }).catch(() => {});
     }
 
     setSavingSession(false);
@@ -268,6 +286,25 @@ export default function AdminPlanningPage() {
         await supabase.rpc("decrement_individual_balance", {
           p_member_id: editForm.assigned_member_id,
         });
+
+        // Email the new member
+        const sessionName = editingSession.class_types.name;
+        const dateObj = new Date(editingSession.start_time);
+        const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+        const startHour = dateObj.toTimeString().slice(0, 5);
+        const endHour = new Date(editingSession.end_time).toTimeString().slice(0, 5);
+        fetch("/api/admin/emails/booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memberId: editForm.assigned_member_id,
+            sessionName,
+            sessionDate,
+            sessionTime: `${startHour} – ${endHour}`,
+            coachName: editForm.coach_name,
+            recurring: false,
+          }),
+        }).catch(() => {});
       }
     }
 
@@ -305,6 +342,25 @@ export default function AdminPlanningPage() {
           await supabase.rpc(rpcFn, { p_member_id: b.member_id });
         }
       }
+
+      // Send cancellation emails to all booked members
+      const memberIds = [...new Set(confirmedBookings.map((b) => b.member_id))];
+      const sessionName = editingSession.class_types.name;
+      const dateObj = new Date(editingSession.start_time);
+      const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const startHour = dateObj.toTimeString().slice(0, 5);
+      const endHour = new Date(editingSession.end_time).toTimeString().slice(0, 5);
+      fetch("/api/admin/emails/cancellation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberIds,
+          sessionName,
+          sessionDate,
+          sessionTime: `${startHour} – ${endHour}`,
+          sessionType: editingSession.session_type,
+        }),
+      }).catch(() => {});
     }
 
     await supabase
