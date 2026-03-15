@@ -266,7 +266,7 @@ export function WeeklyCalendar({
           class_session_id: session.id,
           status: "confirmed",
           session_debited: true,
-          guest_names: guests.length > 0 ? guests.join(", ") : null,
+          ...(guests.length > 0 ? { guest_names: guests.join(", ") } : {}),
           booked_at: new Date().toISOString(),
           cancelled_at: null,
         },
