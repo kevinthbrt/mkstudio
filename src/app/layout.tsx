@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "MK Studio",
   description: "Gestion de salle de sport MK Studio",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

@@ -23,7 +23,7 @@ function layout(content: string): string {
           <!-- Header -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
-              <div style="width:56px;height:56px;background:linear-gradient(135deg,#D4AF37,#B8941E);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+              <div style="width:56px;height:56px;background:linear-gradient(135deg,#D4AF37,#B8941E);border-radius:14px;margin:0 auto 12px auto;">
                 <span style="color:#000;font-weight:800;font-size:20px;line-height:56px;display:block;text-align:center;">MK</span>
               </div>
               <div style="color:#D4AF37;font-size:22px;font-weight:700;letter-spacing:0.5px;">MK Studio</div>

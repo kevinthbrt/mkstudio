@@ -101,12 +101,13 @@ export async function POST(request: NextRequest) {
       .eq("id", invoiceSettings.id);
   }
 
-  // Send purchase confirmation email to member (non-blocking)
+  // Send purchase confirmation email to member
   if (member?.user_id) {
-    const adminClient = createAdminClient();
-    adminClient.auth.admin.getUserById(member.user_id).then(({ data: authUser }) => {
+    try {
+      const adminClient = createAdminClient();
+      const { data: authUser } = await adminClient.auth.admin.getUserById(member.user_id);
       if (authUser?.user?.email) {
-        sendPurchaseConfirmationEmail({
+        await sendPurchaseConfirmationEmail({
           to: authUser.user.email,
           firstName: member.first_name ?? "",
           productName: product.name,
@@ -115,9 +116,11 @@ export async function POST(request: NextRequest) {
           sessionType: product.session_type ?? "collective",
           invoiceNumber,
           orderId: order.id,
-        }).catch((err) => console.error("[admin/orders] email error:", err));
+        });
       }
-    }).catch(() => {});
+    } catch (err) {
+      console.error("[admin/orders] email error:", err);
+    }
   }
 
   return NextResponse.json({
