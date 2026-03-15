@@ -227,6 +227,91 @@ export async function sendPurchaseConfirmationEmail(params: {
   });
 }
 
+// ─── Individual session booking by admin ──────────────────────────────────────
+export async function sendIndividualSessionBookingEmail(params: {
+  to: string;
+  firstName: string;
+  sessionName: string;
+  sessionDate: string;
+  sessionTime: string;
+  coachName: string;
+  recurring?: boolean;
+}) {
+  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, recurring } = params;
+
+  const html = layout(`
+    <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#4ade80;font-size:13px;font-weight:600;">✓ Séance individuelle confirmée</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ta séance individuelle est planifiée.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+      ${infoRow("Coach", coachName)}
+      ${recurring ? infoRow("Récurrence", "Chaque semaine") : ""}
+    </table>
+    ${divider()}
+    <div style="background:#f9731611;border:1px solid #f9731633;border-radius:10px;padding:14px;margin-bottom:24px;">
+      <p style="color:#fb923c;font-size:13px;font-weight:600;margin:0 0 6px;">⚠️ Politique d&apos;annulation</p>
+      <p style="color:#d1d5db;font-size:13px;line-height:1.6;margin:0;">
+        Pour annuler, contacte ton coach <strong style="color:#ffffff;">au moins 24h à l&apos;avance</strong>. Sans annulation dans ce délai, la séance sera décomptée de ton solde.
+      </p>
+    </div>
+    <div style="text-align:center;">
+      ${btn("Voir mon planning", `${SITE_URL}/dashboard`)}
+    </div>
+  `);
+
+  return getResend().emails.send({
+    from: FROM,
+    to,
+    subject: `Séance individuelle confirmée — ${sessionName}`,
+    html,
+  });
+}
+
+// ─── Session cancelled by admin ────────────────────────────────────────────────
+export async function sendSessionCancelledByAdminEmail(params: {
+  to: string;
+  firstName: string;
+  sessionName: string;
+  sessionDate: string;
+  sessionTime: string;
+  sessionType: "collective" | "individual";
+}) {
+  const { to, firstName, sessionName, sessionDate, sessionTime, sessionType } = params;
+  const balanceLabel = sessionType === "individual" ? "individuel" : "collectif";
+
+  const html = layout(`
+    <div style="display:inline-block;background:#f9731633;border:1px solid #f9731644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#fb923c;font-size:13px;font-weight:600;">Cours annulé</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ce cours a été annulé par le coach.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+    </table>
+    ${divider()}
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 20px;">
+      Ta séance a été automatiquement remboursée sur ton solde ${balanceLabel}.
+    </p>
+    <div style="text-align:center;">
+      ${btn("Voir le planning", `${SITE_URL}/dashboard/planning`)}
+    </div>
+  `);
+
+  return getResend().emails.send({
+    from: FROM,
+    to,
+    subject: `Cours annulé — ${sessionName}`,
+    html,
+  });
+}
+
 // ─── 24h reminder ─────────────────────────────────────────────────────────────
 export async function sendSessionReminderEmail(params: {
   to: string;
