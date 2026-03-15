@@ -4,6 +4,7 @@ import { Users, Zap, CreditCard, Calendar, ArrowRight } from "lucide-react";
 import { formatPriceFromEuros, formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import Link from "next/link";
+import { PushNotificationSetup } from "@/components/PushNotificationSetup";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -53,9 +54,14 @@ export default async function AdminDashboard() {
         <div className="absolute top-0 right-0 w-48 h-48 pointer-events-none"
           style={{ background: "radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
         />
-        <p className="text-xs font-semibold text-[#D4AF37]/60 uppercase tracking-widest mb-1">Administration</p>
-        <h1 className="text-2xl font-black text-white tracking-tight">Tableau de bord</h1>
-        <p className="text-gray-500 text-sm mt-1">Vue d&apos;ensemble de MK Studio</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold text-[#D4AF37]/60 uppercase tracking-widest mb-1">Administration</p>
+            <h1 className="text-2xl font-black text-white tracking-tight">Tableau de bord</h1>
+            <p className="text-gray-500 text-sm mt-1">Vue d&apos;ensemble de MK Studio</p>
+          </div>
+          <PushNotificationSetup />
+        </div>
       </div>
 
       {/* Stats */}

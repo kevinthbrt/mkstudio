@@ -79,11 +79,15 @@ export default function RegisterPage() {
         });
       }
 
+      // Send welcome email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/welcome", { method: "POST" }).catch(() => {});
+
       router.push("/dashboard");
       return;
     }
 
-    // Email confirmation required
+    // Email confirmation required — send welcome email after confirmation
+    // (Supabase will handle the confirmation email; we send welcome on first login)
     setDone(true);
     setLoading(false);
   }

@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
   if (!supabaseUrl || !supabaseAnonKey) {
     const pathname = request.nextUrl.pathname;
     const publicRoutes = ["/login", "/register", "/"];
-    if (!publicRoutes.includes(pathname)) {
+    if (!publicRoutes.includes(pathname) && !pathname.startsWith("/api/cron/")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next({ request });
@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     const publicRoutes = ["/login", "/register", "/"];
-    const isPublicRoute = publicRoutes.includes(pathname);
+    const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith("/api/cron/");
     const isAuthRoute = pathname === "/login" || pathname === "/register";
 
     if (!user && !isPublicRoute) {
@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
     // On error, redirect to login for protected routes
     const pathname = request.nextUrl.pathname;
     const publicRoutes = ["/login", "/register", "/"];
-    if (!publicRoutes.includes(pathname)) {
+    if (!publicRoutes.includes(pathname) && !pathname.startsWith("/api/cron/")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }

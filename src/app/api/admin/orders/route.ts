@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
   // Credit the correct balance based on product type
   const { data: member } = await supabase
     .from("profiles")
-    .select("collective_balance, individual_balance")
+    .select("collective_balance, individual_balance, first_name, user_id")
     .eq("id", member_id)
     .single();
 
@@ -97,6 +99,25 @@ export async function POST(request: NextRequest) {
       .from("invoice_settings")
       .update({ next_invoice_number: invoiceSettings.next_invoice_number + 1 })
       .eq("id", invoiceSettings.id);
+  }
+
+  // Send purchase confirmation email to member (non-blocking)
+  if (member?.user_id) {
+    const adminClient = createAdminClient();
+    adminClient.auth.admin.getUserById(member.user_id).then(({ data: authUser }) => {
+      if (authUser?.user?.email) {
+        sendPurchaseConfirmationEmail({
+          to: authUser.user.email,
+          firstName: member.first_name ?? "",
+          productName: product.name,
+          amount: product.price,
+          sessionCount: product.session_count,
+          sessionType: product.session_type ?? "collective",
+          invoiceNumber,
+          orderId: order.id,
+        }).catch((err) => console.error("[admin/orders] email error:", err));
+      }
+    }).catch(() => {});
   }
 
   return NextResponse.json({

@@ -47,6 +47,8 @@ export interface ClassSessionWithType {
 
 interface CalendarProps {
   memberId?: string;
+  memberEmail?: string;
+  memberFirstName?: string;
   collectiveBalance?: number;
   individualBalance?: number;
   isAdmin?: boolean;
@@ -61,6 +63,8 @@ const DAYS_FULL_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi
 
 export function WeeklyCalendar({
   memberId,
+  memberEmail,
+  memberFirstName,
   collectiveBalance = 0,
   individualBalance = 0,
   isAdmin = false,
@@ -265,6 +269,34 @@ export function WeeklyCalendar({
             : sess
         )
       );
+
+      // Send cancellation email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/cancellation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          refundedSessions: existingBooking ? 1 + (existingBooking.guest_names ? existingBooking.guest_names.split(",").filter(Boolean).length : 0) : 1,
+          sessionType: session.session_type,
+        }),
+      }).catch(() => {});
+
+      // Notify admin via push
+      if (memberFirstName) {
+        fetch("/api/notifications/push-member-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "cancellation",
+            memberName: memberFirstName,
+            sessionName: session.class_types.name,
+            sessionDate: formatDate(session.start_time),
+            sessionTime: formatTime(session.start_time),
+          }),
+        }).catch(() => {});
+      }
     } else {
       const guests = inviteFriends ? parseFriends(friendNames) : [];
       const totalSpots = 1 + guests.length;
@@ -333,6 +365,34 @@ export function WeeklyCalendar({
             : sess
         )
       );
+
+      // Send booking confirmation email (non-blocking) — identity derived server-side from session
+      fetch("/api/emails/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          coachName: session.coach_name,
+          guests: guests.length > 0 ? guests : undefined,
+        }),
+      }).catch(() => {});
+
+      // Notify admin via push
+      if (memberFirstName) {
+        fetch("/api/notifications/push-member-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "booking",
+            memberName: memberFirstName,
+            sessionName: session.class_types.name,
+            sessionDate: formatDate(session.start_time),
+            sessionTime: formatTime(session.start_time),
+          }),
+        }).catch(() => {});
+      }
     }
 
     setBooking(false);
