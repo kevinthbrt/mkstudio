@@ -124,7 +124,7 @@ export default function PurchasesPage() {
         const a = document.createElement("a");
         a.href = url;
         const order = orders.find((o) => o.id === orderId);
-        a.download = `facture-${order?.invoice_number || orderId}.html`;
+        a.download = `facture-${order?.invoice_number || orderId}.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
