@@ -18,14 +18,11 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Supabase handles the hash fragment automatically via onAuthStateChange
+    // With PKCE flow, the session is already established by /api/auth/callback
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setReady(true);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true);
     });
-    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
