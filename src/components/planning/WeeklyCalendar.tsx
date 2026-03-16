@@ -162,23 +162,32 @@ export function WeeklyCalendar({
         setSessions(rawSessions);
       }
     } else {
-      setSessions(rawSessions);
-    }
+      if (memberId) {
+        const { data: bookingsData } = await supabase
+          .from("class_bookings")
+          .select("class_session_id, status, guest_names")
+          .eq("member_id", memberId);
 
-    if (memberId) {
-      const { data: bookingsData } = await supabase
-        .from("class_bookings")
-        .select("class_session_id, status, guest_names")
-        .eq("member_id", memberId);
+        const bookingMap: Record<string, string> = {};
+        const guestMap: Record<string, string | null> = {};
+        (bookingsData || []).forEach((b: any) => {
+          bookingMap[b.class_session_id] = b.status;
+          guestMap[b.class_session_id] = b.guest_names ?? null;
+        });
+        setBookings(bookingMap);
+        setBookingGuests(guestMap);
 
-      const bookingMap: Record<string, string> = {};
-      const guestMap: Record<string, string | null> = {};
-      (bookingsData || []).forEach((b: any) => {
-        bookingMap[b.class_session_id] = b.status;
-        guestMap[b.class_session_id] = b.guest_names ?? null;
-      });
-      setBookings(bookingMap);
-      setBookingGuests(guestMap);
+        // Members only see individual/duo sessions they are enrolled in
+        setSessions(
+          rawSessions.filter(
+            (s) =>
+              s.session_type === "collective" ||
+              bookingMap[s.id] === "confirmed"
+          )
+        );
+      } else {
+        setSessions(rawSessions);
+      }
     }
 
     setLoading(false);
