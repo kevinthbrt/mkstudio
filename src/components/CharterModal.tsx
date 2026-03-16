@@ -39,7 +39,6 @@ const CHARTER_SECTIONS = [
       "Une tenue de sport propre et adaptée est obligatoire pour accéder aux cours.",
       "Les chaussures de sport propres (exclusivement réservées à l'intérieur) sont obligatoires. Les chaussures d'extérieur ou salissantes ne sont pas autorisées sur les tapis et équipements.",
       "Chaque adhérent doit apporter sa propre serviette pour des raisons d'hygiène. L'utilisation d'une serviette est obligatoire sur les machines et les tapis.",
-      "Merci de vous assurer que votre hygiène corporelle est correcte avant chaque séance.",
     ],
   },
   {
