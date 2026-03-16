@@ -246,7 +246,7 @@ export function WeeklyCalendar({
       .select("id, status")
       .eq("member_id", adminBookingMemberId)
       .eq("class_session_id", session.id)
-      .single();
+      .maybeSingle();
 
     if (existing?.status === "confirmed") {
       setAdminBookingError(`${member.first_name} ${member.last_name} est déjà inscrit(e) à ce cours.`);
