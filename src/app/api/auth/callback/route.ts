@@ -27,7 +27,14 @@ export async function GET(request: NextRequest) {
         },
       }
     );
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data: sessionData } = await supabase.auth.exchangeCodeForSession(code);
+
+    // Detect password recovery flow and redirect to reset-password page
+    const isRecovery = sessionData.session?.user?.recovery_sent_at &&
+      Date.now() - new Date(sessionData.session.user.recovery_sent_at).getTime() < 600_000;
+    if (isRecovery && next === "/dashboard") {
+      return NextResponse.redirect(`${origin}/reset-password`);
+    }
 
     // Ensure profile exists (fallback if the DB trigger didn't fire)
     const { data: { user } } = await supabase.auth.getUser();
