@@ -145,10 +145,10 @@ export async function sendCancellationEmail(params: {
   sessionDate: string;
   sessionTime: string;
   refundedSessions: number;
-  sessionType: "collective" | "individual";
+  sessionType: "collective" | "individual" | "duo";
 }) {
   const { to, firstName, sessionName, sessionDate, sessionTime, refundedSessions, sessionType } = params;
-  const balanceLabel = sessionType === "individual" ? "individuel" : "collectif";
+  const balanceLabel = sessionType === "individual" ? "individuel" : sessionType === "duo" ? "duo" : "collectif";
 
   const html = layout(`
     <div style="display:inline-block;background:#f9731633;border:1px solid #f9731644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
@@ -186,12 +186,12 @@ export async function sendPurchaseConfirmationEmail(params: {
   productName: string;
   amount: number;
   sessionCount: number;
-  sessionType: "collective" | "individual";
+  sessionType: "collective" | "individual" | "duo";
   invoiceNumber: string;
   orderId: string;
 }) {
   const { to, firstName, productName, amount, sessionCount, sessionType, invoiceNumber, orderId } = params;
-  const balanceLabel = sessionType === "individual" ? "individuel" : "collectif";
+  const balanceLabel = sessionType === "individual" ? "individuel" : sessionType === "duo" ? "duo" : "collectif";
   const formattedAmount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
 
   const html = layout(`
@@ -279,10 +279,10 @@ export async function sendSessionCancelledByAdminEmail(params: {
   sessionName: string;
   sessionDate: string;
   sessionTime: string;
-  sessionType: "collective" | "individual";
+  sessionType: "collective" | "individual" | "duo";
 }) {
   const { to, firstName, sessionName, sessionDate, sessionTime, sessionType } = params;
-  const balanceLabel = sessionType === "individual" ? "individuel" : "collectif";
+  const balanceLabel = sessionType === "individual" ? "individuel" : sessionType === "duo" ? "duo" : "collectif";
 
   const html = layout(`
     <div style="display:inline-block;background:#f9731633;border:1px solid #f9731644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
