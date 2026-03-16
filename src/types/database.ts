@@ -74,7 +74,7 @@ export interface Database {
           description?: string | null;
           price: number;
           session_count: number;
-          session_type?: "collective" | "individual";
+          session_type?: "collective" | "individual" | "duo";
           active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -85,7 +85,7 @@ export interface Database {
           description?: string | null;
           price?: number;
           session_count?: number;
-          session_type?: "collective" | "individual";
+          session_type?: "collective" | "individual" | "duo";
           active?: boolean;
           updated_at?: string;
         };
@@ -250,7 +250,7 @@ export interface Database {
           is_cancelled?: boolean;
           is_hidden?: boolean;
           recurring_rule?: string | null;
-          session_type?: "collective" | "individual";
+          session_type?: "collective" | "individual" | "duo";
           assigned_member_id?: string | null;
           created_at?: string;
         };
@@ -265,7 +265,7 @@ export interface Database {
           is_cancelled?: boolean;
           is_hidden?: boolean;
           recurring_rule?: string | null;
-          session_type?: "collective" | "individual";
+          session_type?: "collective" | "individual" | "duo";
           assigned_member_id?: string | null;
         };
         Relationships: [];
