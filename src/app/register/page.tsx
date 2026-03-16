@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { CharterModal } from "@/components/CharterModal";
-import { Lock, Mail, User, CheckCircle } from "lucide-react";
+import { Lock, Mail, User, CheckCircle, Cake } from "lucide-react";
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -87,10 +88,13 @@ export default function RegisterPage() {
         });
       }
 
-      // Record charter acceptance
+      // Record charter acceptance and date of birth
       await supabase
         .from("profiles")
-        .update({ charter_accepted_at: new Date().toISOString() })
+        .update({
+          charter_accepted_at: new Date().toISOString(),
+          date_of_birth: dateOfBirth || null,
+        })
         .eq("user_id", data.user.id);
 
       // Send welcome email (non-blocking) — identity derived server-side from session
@@ -103,6 +107,7 @@ export default function RegisterPage() {
     // Email confirmation required — record charter acceptance after first login
     // Store acceptance intent in localStorage so we can record it on first login
     localStorage.setItem("mk_charter_accepted", new Date().toISOString());
+    if (dateOfBirth) localStorage.setItem("mk_date_of_birth", dateOfBirth);
 
     setDone(true);
     setLoading(false);
@@ -183,6 +188,15 @@ export default function RegisterPage() {
               icon={<Mail size={16} />}
               required
               autoComplete="email"
+            />
+            <Input
+              label="Date de naissance"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              icon={<Cake size={16} />}
+              required
+              autoComplete="bday"
             />
             <Input
               label="Mot de passe"

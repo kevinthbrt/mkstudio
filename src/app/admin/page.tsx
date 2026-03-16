@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/ui/Card";
-import { Users, Zap, CreditCard, Calendar, ArrowRight } from "lucide-react";
+import { Users, Zap, CreditCard, Calendar, ArrowRight, Cake } from "lucide-react";
 import { formatPriceFromEuros, formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import Link from "next/link";
@@ -14,6 +14,7 @@ export default async function AdminDashboard() {
     { data: recentOrders },
     { data: upcomingSessions },
     { data: allOrders },
+    { data: membersWithBirthday },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -34,6 +35,11 @@ export default async function AdminDashboard() {
     supabase
       .from("orders")
       .select("amount, sessions_purchased"),
+    supabase
+      .from("profiles")
+      .select("first_name, last_name, date_of_birth")
+      .eq("role", "member")
+      .not("date_of_birth", "is", null),
   ]);
 
   const totalRevenue = (allOrders || []).reduce((sum, o) => sum + o.amount, 0);
@@ -41,6 +47,22 @@ export default async function AdminDashboard() {
     (sum, o) => sum + o.sessions_purchased,
     0
   );
+
+  // Compute upcoming birthdays (next 30 days)
+  const today = new Date();
+  const upcomingBirthdays = (membersWithBirthday || [])
+    .map((m) => {
+      const dob = new Date(m.date_of_birth + "T00:00:00");
+      const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+      if (nextBirthday < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+        nextBirthday.setFullYear(today.getFullYear() + 1);
+      }
+      const diffDays = Math.round((nextBirthday.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / (1000 * 60 * 60 * 24));
+      const age = nextBirthday.getFullYear() - dob.getFullYear();
+      return { ...m, nextBirthday, diffDays, age };
+    })
+    .filter((m) => m.diffDays <= 30)
+    .sort((a, b) => a.diffDays - b.diffDays);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -195,6 +217,51 @@ export default async function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Upcoming birthdays */}
+      {upcomingBirthdays.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Cake size={14} className="text-pink-400" />
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Anniversaires à venir</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {upcomingBirthdays.map((m, i) => (
+              <div
+                key={i}
+                className="rounded-2xl p-4 flex items-center gap-3"
+                style={{
+                  background: "linear-gradient(135deg, rgba(30,28,45,0.8) 0%, rgba(22,21,38,0.9) 100%)",
+                  border: m.diffDays === 0
+                    ? "1px solid rgba(236,72,153,0.3)"
+                    : "1px solid rgba(255,255,255,0.05)",
+                }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-pink-500/15 flex items-center justify-center flex-shrink-0">
+                  <Cake size={16} className="text-pink-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold">
+                    {m.first_name} {m.last_name}
+                  </p>
+                  <p className="text-gray-500 text-xs mt-0.5">
+                    {m.age} ans · {m.nextBirthday.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {m.diffDays === 0 ? (
+                    <span className="text-xs font-semibold text-pink-400">Aujourd&apos;hui !</span>
+                  ) : m.diffDays === 1 ? (
+                    <span className="text-xs font-semibold text-pink-300">Demain</span>
+                  ) : (
+                    <span className="text-xs text-gray-500">J-{m.diffDays}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

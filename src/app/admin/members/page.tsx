@@ -89,6 +89,7 @@ export default function MembersPage() {
     last_name: "",
     email: "",
     phone: "",
+    date_of_birth: "",
     password: "",
   });
   const [creating, setCreating] = useState(false);
@@ -161,7 +162,7 @@ export default function MembersPage() {
       setCreateError(data.error || "Erreur lors de la création");
     } else {
       setShowCreate(false);
-      setNewMember({ first_name: "", last_name: "", email: "", phone: "", password: "" });
+      setNewMember({ first_name: "", last_name: "", email: "", phone: "", date_of_birth: "", password: "" });
       loadMembers();
     }
     setCreating(false);
@@ -396,6 +397,12 @@ export default function MembersPage() {
             icon={<Phone size={14} />}
           />
           <Input
+            label="Date de naissance (optionnel)"
+            type="date"
+            value={newMember.date_of_birth}
+            onChange={(e) => setNewMember({ ...newMember, date_of_birth: e.target.value })}
+          />
+          <Input
             label="Mot de passe temporaire"
             type="password"
             value={newMember.password}
@@ -448,6 +455,11 @@ export default function MembersPage() {
                 <p className="text-gray-500 text-sm">{selectedMember.email}</p>
                 {selectedMember.phone && (
                   <p className="text-gray-500 text-sm">{selectedMember.phone}</p>
+                )}
+                {(selectedMember as any).date_of_birth && (
+                  <p className="text-gray-500 text-sm">
+                    Né(e) le {new Date((selectedMember as any).date_of_birth + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
                 )}
               </div>
             </div>
