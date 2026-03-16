@@ -60,6 +60,7 @@ export default function AdminPlanningPage() {
     duration_minutes: "60",
   });
 
+  const [duoMemberSearch, setDuoMemberSearch] = useState("");
   const [savingSession, setSavingSession] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [cancellingSession, setCancellingSession] = useState(false);
@@ -242,6 +243,7 @@ export default function AdminPlanningPage() {
 
     setSavingSession(false);
     setShowCreateSession(false);
+    setDuoMemberSearch("");
     setRefreshKey((k) => k + 1);
     setSessionForm({
       class_type_id: "",
@@ -572,28 +574,65 @@ export default function AdminPlanningPage() {
           {isDuo && (
             <div>
               <p className="text-sm font-medium text-gray-300 mb-2">Adhérents à inscrire</p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl p-2">
-                {members.map((m) => (
-                  <label key={m.id} className="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-[#1a1a1a] transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={sessionForm.assigned_member_ids.includes(m.id)}
-                      onChange={(e) => {
-                        const ids = e.target.checked
-                          ? [...sessionForm.assigned_member_ids, m.id]
-                          : sessionForm.assigned_member_ids.filter((id) => id !== m.id);
-                        setSessionForm({ ...sessionForm, assigned_member_ids: ids });
-                      }}
-                      className="w-4 h-4 accent-purple-400"
-                    />
-                    <span className="text-sm text-white">{m.first_name} {m.last_name}</span>
-                  </label>
-                ))}
-              </div>
+              {/* Selected members chips */}
               {sessionForm.assigned_member_ids.length > 0 && (
-                <p className="text-xs text-purple-400 mt-1.5">
-                  {sessionForm.assigned_member_ids.length} adhérent(s) sélectionné(s)
-                </p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {sessionForm.assigned_member_ids.map((id) => {
+                    const m = members.find((m) => m.id === id);
+                    if (!m) return null;
+                    return (
+                      <span key={id} className="flex items-center gap-1 bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs rounded-full px-2.5 py-1">
+                        {m.first_name} {m.last_name}
+                        <button
+                          type="button"
+                          onClick={() => setSessionForm({ ...sessionForm, assigned_member_ids: sessionForm.assigned_member_ids.filter((i) => i !== id) })}
+                          className="text-purple-400/60 hover:text-purple-300 ml-0.5 leading-none"
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Search input */}
+              <input
+                type="text"
+                value={duoMemberSearch}
+                onChange={(e) => setDuoMemberSearch(e.target.value)}
+                placeholder="Rechercher un adhérent..."
+                className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-500/50 placeholder:text-gray-600"
+              />
+              {/* Filtered results */}
+              {duoMemberSearch.trim().length > 0 && (
+                <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                  {members
+                    .filter((m) => {
+                      const q = duoMemberSearch.toLowerCase();
+                      return (
+                        !sessionForm.assigned_member_ids.includes(m.id) &&
+                        (`${m.first_name} ${m.last_name}`).toLowerCase().includes(q)
+                      );
+                    })
+                    .slice(0, 8)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setSessionForm({ ...sessionForm, assigned_member_ids: [...sessionForm.assigned_member_ids, m.id] });
+                          setDuoMemberSearch("");
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-purple-500/10 transition-colors"
+                      >
+                        {m.first_name} {m.last_name}
+                      </button>
+                    ))}
+                  {members.filter((m) => {
+                    const q = duoMemberSearch.toLowerCase();
+                    return !sessionForm.assigned_member_ids.includes(m.id) && (`${m.first_name} ${m.last_name}`).toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                  )}
+                </div>
               )}
             </div>
           )}
