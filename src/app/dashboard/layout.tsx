@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { CharterSync } from "@/components/CharterSync";
 
 export default async function MemberLayout({
   children,
@@ -25,6 +26,7 @@ export default async function MemberLayout({
 
   return (
     <DashboardLayout profile={profile} title="MK Studio">
+      <CharterSync />
       {children}
     </DashboardLayout>
   );
