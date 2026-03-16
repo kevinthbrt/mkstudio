@@ -31,6 +31,7 @@ export default function SettingsPage() {
     payment_terms: "Paiement à réception de facture",
     invoice_prefix: "MKS",
     bank_details: "",
+    legal_status: "",
   });
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function SettingsPage() {
         payment_terms: data.payment_terms,
         invoice_prefix: data.invoice_prefix,
         bank_details: data.bank_details || "",
+        legal_status: data.legal_status || "",
       });
     }
     setLoading(false);
@@ -88,6 +90,7 @@ export default function SettingsPage() {
       ape_code: form.ape_code || null,
       bank_details: form.bank_details || null,
       stamp_url: stampUrl || null,
+      legal_status: form.legal_status || null,
     };
 
     if (settings) {
@@ -224,6 +227,12 @@ export default function SettingsPage() {
             value={form.ape_code}
             onChange={(e) => setForm({ ...form, ape_code: e.target.value })}
             placeholder="8551Z (enseignement de disciplines sportives)"
+          />
+          <Input
+            label="Statut juridique (optionnel)"
+            value={form.legal_status}
+            onChange={(e) => setForm({ ...form, legal_status: e.target.value })}
+            placeholder="Ex : Auto-entrepreneur, SASU, EI..."
           />
 
           <div>
