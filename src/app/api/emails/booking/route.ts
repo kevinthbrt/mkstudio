@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
 
   const body = await request.json();
-  const { sessionName, sessionDate, sessionTime, coachName, guests } = body;
+  const { sessionName, sessionDate, sessionTime, coachName, guests, minCancelHours } = body;
 
   if (!sessionName) return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
 
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       sessionTime,
       coachName,
       guests,
+      minCancelHours,
     });
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -100,12 +100,22 @@ export async function sendBookingConfirmationEmail(params: {
   sessionTime: string;
   coachName: string;
   guests?: string[];
+  minCancelHours?: number;
 }) {
-  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, guests } = params;
+  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, guests, minCancelHours } = params;
 
   const guestSection = guests && guests.length > 0
     ? `<tr>${infoRow("Invité(s)", guests.join(", "))}</tr>`
     : "";
+
+  const cancelPolicy = minCancelHours != null
+    ? `<div style="background:#f9731611;border:1px solid #f9731633;border-radius:10px;padding:14px;margin-bottom:24px;">
+        <p style="color:#fb923c;font-size:13px;font-weight:600;margin:0 0 6px;">⚠️ Politique d&apos;annulation</p>
+        <p style="color:#d1d5db;font-size:13px;line-height:1.6;margin:0;">
+          Tu peux annuler ton inscription directement depuis ton espace MK Studio, <strong style="color:#ffffff;">jusqu&apos;à ${minCancelHours}h avant le cours</strong>. Passé ce délai, la séance sera décomptée de ton solde.
+        </p>
+      </div>`
+    : `<p style="color:#6b7280;font-size:12px;margin:0 0 20px;">Pour annuler, rendez-vous sur ton espace MK Studio. Vérifie les délais d&apos;annulation autorisés.</p>`;
 
   const html = layout(`
     <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
@@ -121,9 +131,7 @@ export async function sendBookingConfirmationEmail(params: {
       ${guestSection}
     </table>
     ${divider()}
-    <p style="color:#6b7280;font-size:12px;margin:0 0 20px;">
-      Pour annuler, rendez-vous sur ton espace MK Studio. Vérifie les délais d'annulation autorisés.
-    </p>
+    ${cancelPolicy}
     <div style="text-align:center;">
       ${btn("Voir mon planning", `${SITE_URL}/dashboard`)}
     </div>
@@ -227,7 +235,7 @@ export async function sendPurchaseConfirmationEmail(params: {
   });
 }
 
-// ─── Individual session booking by admin ──────────────────────────────────────
+// ─── Individual / Duo session booking by admin ────────────────────────────────
 export async function sendIndividualSessionBookingEmail(params: {
   to: string;
   firstName: string;
@@ -236,15 +244,19 @@ export async function sendIndividualSessionBookingEmail(params: {
   sessionTime: string;
   coachName: string;
   recurring?: boolean;
+  sessionType?: "individual" | "duo";
 }) {
-  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, recurring } = params;
+  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, recurring, sessionType = "individual" } = params;
+  const isDuo = sessionType === "duo";
+  const label = isDuo ? "duo" : "individuelle";
+  const subjectLabel = isDuo ? "Séance duo confirmée" : "Séance individuelle confirmée";
 
   const html = layout(`
     <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
-      <span style="color:#4ade80;font-size:13px;font-weight:600;">✓ Séance individuelle confirmée</span>
+      <span style="color:#4ade80;font-size:13px;font-weight:600;">✓ Séance ${label} confirmée</span>
     </div>
     <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
-    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ta séance individuelle est planifiée.</p>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ta séance ${label} est planifiée.</p>
     ${divider()}
     <table width="100%" cellpadding="0" cellspacing="0">
       ${infoRow("Date", sessionDate)}
@@ -267,7 +279,7 @@ export async function sendIndividualSessionBookingEmail(params: {
   return getResend().emails.send({
     from: FROM,
     to,
-    subject: `Séance individuelle confirmée — ${sessionName}`,
+    subject: `${subjectLabel} — ${sessionName}`,
     html,
   });
 }

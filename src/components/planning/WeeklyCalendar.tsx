@@ -292,6 +292,22 @@ export function WeeklyCalendar({
       prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
     );
 
+    // Send email + push for duo (same as individual)
+    if (isDuo) {
+      fetch("/api/admin/emails/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: adminBookingMemberId,
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          coachName: session.coach_name,
+          sessionType: "duo",
+        }),
+      }).catch(() => {});
+    }
+
     setAdminBookingMemberId("");
     setAdminBooking(false);
   }
@@ -555,6 +571,7 @@ export function WeeklyCalendar({
           sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
           coachName: session.coach_name,
           guests: guests.length > 0 ? guests : undefined,
+          minCancelHours: session.min_cancel_hours,
         }),
       }).catch(() => {});
 

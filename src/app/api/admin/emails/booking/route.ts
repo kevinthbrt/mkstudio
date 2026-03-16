@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { memberId, sessionName, sessionDate, sessionTime, coachName, recurring } = body;
+  const { memberId, sessionName, sessionDate, sessionTime, coachName, recurring, sessionType } = body;
 
   if (!memberId || !sessionName) {
     return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         sessionTime,
         coachName,
         recurring: recurring ?? false,
+        sessionType: sessionType ?? "individual",
       });
     }
 
