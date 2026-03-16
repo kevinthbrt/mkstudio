@@ -61,6 +61,8 @@ export default function AdminPlanningPage() {
   });
 
   const [duoMemberSearch, setDuoMemberSearch] = useState("");
+  const [soloMemberSearch, setSoloMemberSearch] = useState("");
+  const [editSoloMemberSearch, setEditSoloMemberSearch] = useState("");
   const [savingSession, setSavingSession] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [cancellingSession, setCancellingSession] = useState(false);
@@ -244,6 +246,7 @@ export default function AdminPlanningPage() {
     setSavingSession(false);
     setShowCreateSession(false);
     setDuoMemberSearch("");
+    setSoloMemberSearch("");
     setRefreshKey((k) => k + 1);
     setSessionForm({
       class_type_id: "",
@@ -354,6 +357,7 @@ export default function AdminPlanningPage() {
     }
 
     setSavingEdit(false);
+    setEditSoloMemberSearch("");
     setShowEditSession(false);
     setEditingSession(null);
     setRefreshKey((k) => k + 1);
@@ -554,21 +558,51 @@ export default function AdminPlanningPage() {
           </div>
 
           {isIndividual && (
-            <Select
-              label="Adhérent concerné"
-              value={sessionForm.assigned_member_id}
-              onChange={(e) =>
-                setSessionForm({ ...sessionForm, assigned_member_id: e.target.value })
-              }
-              options={[
-                { value: "", label: "Sélectionner un adhérent..." },
-                ...members.map((m) => ({
-                  value: m.id,
-                  label: `${m.first_name} ${m.last_name}`,
-                })),
-              ]}
-              required={isIndividual}
-            />
+            <div>
+              <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+              {sessionForm.assigned_member_id ? (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
+                    {(() => { const m = members.find((m) => m.id === sessionForm.assigned_member_id); return m ? `${m.first_name} ${m.last_name}` : ""; })()}
+                    <button
+                      type="button"
+                      onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: "" }); setSoloMemberSearch(""); }}
+                      className="text-blue-400/60 hover:text-blue-300 ml-0.5 leading-none"
+                    >×</button>
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={soloMemberSearch}
+                    onChange={(e) => setSoloMemberSearch(e.target.value)}
+                    placeholder="Rechercher un adhérent..."
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500/50 placeholder:text-gray-600"
+                  />
+                  {soloMemberSearch.trim().length > 0 && (
+                    <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                      {members
+                        .filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(soloMemberSearch.toLowerCase()))
+                        .slice(0, 8)
+                        .map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: m.id }); setSoloMemberSearch(""); }}
+                            className="w-full text-left px-3 py-2 text-sm text-white hover:bg-blue-500/10 transition-colors"
+                          >
+                            {m.first_name} {m.last_name}
+                          </button>
+                        ))}
+                      {members.filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(soloMemberSearch.toLowerCase())).length === 0 && (
+                        <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {isDuo && (
@@ -880,20 +914,51 @@ export default function AdminPlanningPage() {
             </div>
 
             {editIsIndividual && (
-              <Select
-                label="Adhérent concerné"
-                value={editForm.assigned_member_id}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, assigned_member_id: e.target.value })
-                }
-                options={[
-                  { value: "", label: "Aucun adhérent..." },
-                  ...members.map((m) => ({
-                    value: m.id,
-                    label: `${m.first_name} ${m.last_name}`,
-                  })),
-                ]}
-              />
+              <div>
+                <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+                {editForm.assigned_member_id ? (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
+                      {(() => { const m = members.find((m) => m.id === editForm.assigned_member_id); return m ? `${m.first_name} ${m.last_name}` : ""; })()}
+                      <button
+                        type="button"
+                        onClick={() => { setEditForm({ ...editForm, assigned_member_id: "" }); setEditSoloMemberSearch(""); }}
+                        className="text-blue-400/60 hover:text-blue-300 ml-0.5 leading-none"
+                      >×</button>
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={editSoloMemberSearch}
+                      onChange={(e) => setEditSoloMemberSearch(e.target.value)}
+                      placeholder="Rechercher un adhérent..."
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500/50 placeholder:text-gray-600"
+                    />
+                    {editSoloMemberSearch.trim().length > 0 && (
+                      <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                        {members
+                          .filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(editSoloMemberSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => { setEditForm({ ...editForm, assigned_member_id: m.id }); setEditSoloMemberSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm text-white hover:bg-blue-500/10 transition-colors"
+                            >
+                              {m.first_name} {m.last_name}
+                            </button>
+                          ))}
+                        {members.filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(editSoloMemberSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             {editIsDuo && (
