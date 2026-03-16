@@ -22,6 +22,8 @@ export interface Database {
           individual_balance: number;
           duo_balance: number;
           legal_status: string | null;
+          charter_accepted_at: string | null;
+          date_of_birth: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -37,6 +39,8 @@ export interface Database {
           individual_balance?: number;
           duo_balance?: number;
           legal_status?: string | null;
+          charter_accepted_at?: string | null;
+          date_of_birth?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -52,6 +56,8 @@ export interface Database {
           individual_balance?: number;
           duo_balance?: number;
           legal_status?: string | null;
+          charter_accepted_at?: string | null;
+          date_of_birth?: string | null;
           updated_at?: string;
         };
         Relationships: [];

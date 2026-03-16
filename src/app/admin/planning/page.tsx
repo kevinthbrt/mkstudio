@@ -523,7 +523,7 @@ export default function AdminPlanningPage() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "collective" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "collective", min_cancel_hours: "3" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   sessionForm.session_type === "collective"
                     ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
@@ -534,7 +534,7 @@ export default function AdminPlanningPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual", assigned_member_ids: [] })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual", assigned_member_ids: [], min_cancel_hours: "24" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   isIndividual
                     ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
@@ -545,7 +545,7 @@ export default function AdminPlanningPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "duo", assigned_member_id: "" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "duo", assigned_member_id: "", min_cancel_hours: "24" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   isDuo
                     ? "bg-purple-500/10 border-purple-500/40 text-purple-400"

@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Lock, Mail, User, CheckCircle } from "lucide-react";
+import { CharterModal } from "@/components/CharterModal";
+import { Lock, Mail, User, CheckCircle, Cake } from "lucide-react";
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
@@ -14,12 +15,14 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [showCharter, setShowCharter] = useState(false);
   const router = useRouter();
 
-  async function handleRegister(e: React.FormEvent) {
+  function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -36,6 +39,12 @@ export default function RegisterPage() {
       return;
     }
 
+    // Show charter for acceptance before creating account
+    setShowCharter(true);
+  }
+
+  async function handleCharterAccepted() {
+    setShowCharter(false);
     setLoading(true);
     const supabase = createClient();
 
@@ -79,6 +88,15 @@ export default function RegisterPage() {
         });
       }
 
+      // Record charter acceptance and date of birth
+      await supabase
+        .from("profiles")
+        .update({
+          charter_accepted_at: new Date().toISOString(),
+          date_of_birth: dateOfBirth || null,
+        })
+        .eq("user_id", data.user.id);
+
       // Send welcome email (non-blocking) — identity derived server-side from session
       fetch("/api/emails/welcome", { method: "POST" }).catch(() => {});
 
@@ -86,8 +104,11 @@ export default function RegisterPage() {
       return;
     }
 
-    // Email confirmation required — send welcome email after confirmation
-    // (Supabase will handle the confirmation email; we send welcome on first login)
+    // Email confirmation required — record charter acceptance after first login
+    // Store acceptance intent in localStorage so we can record it on first login
+    localStorage.setItem("mk_charter_accepted", new Date().toISOString());
+    if (dateOfBirth) localStorage.setItem("mk_date_of_birth", dateOfBirth);
+
     setDone(true);
     setLoading(false);
   }
@@ -136,7 +157,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-[#111111] border border-[#1f1f1f] rounded-2xl p-6 shadow-2xl">
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleFormSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Input
                 label="Prénom"
@@ -167,6 +188,15 @@ export default function RegisterPage() {
               icon={<Mail size={16} />}
               required
               autoComplete="email"
+            />
+            <Input
+              label="Date de naissance"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              icon={<Cake size={16} />}
+              required
+              autoComplete="bday"
             />
             <Input
               label="Mot de passe"
@@ -212,6 +242,10 @@ export default function RegisterPage() {
           MK Studio © {new Date().getFullYear()} — Tous droits réservés
         </p>
       </div>
+
+      {showCharter && (
+        <CharterModal onAccept={handleCharterAccepted} />
+      )}
     </div>
   );
 }
