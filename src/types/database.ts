@@ -155,6 +155,7 @@ export interface Database {
           logo_url: string | null;
           bank_details: string | null;
           stamp_url: string | null;
+          legal_status: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -177,6 +178,7 @@ export interface Database {
           logo_url?: string | null;
           bank_details?: string | null;
           stamp_url?: string | null;
+          legal_status?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -198,6 +200,7 @@ export interface Database {
           logo_url?: string | null;
           bank_details?: string | null;
           stamp_url?: string | null;
+          legal_status?: string | null;
           updated_at?: string;
         };
         Relationships: [];

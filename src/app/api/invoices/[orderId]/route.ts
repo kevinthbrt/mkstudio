@@ -369,6 +369,13 @@ function InvoicePDF({
                 { style: styles.partyText },
                 `APE : ${settings.ape_code}`
               )
+            : null,
+          settings.legal_status
+            ? React.createElement(
+                Text,
+                { style: styles.partyText },
+                settings.legal_status
+              )
             : null
         ),
         // Client
@@ -381,13 +388,6 @@ function InvoicePDF({
             { style: styles.partyName },
             `${member.first_name} ${member.last_name}`
           ),
-          member.legal_status
-            ? React.createElement(
-                Text,
-                { style: styles.partyText },
-                member.legal_status
-              )
-            : null,
           React.createElement(
             Text,
             { style: styles.partyText },
