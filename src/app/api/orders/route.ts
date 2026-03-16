@@ -69,9 +69,11 @@ export async function POST(request: NextRequest) {
   }
 
   const sessionType = product.session_type || "collective";
-  const balanceField = sessionType === "individual" ? "individual_balance" : "collective_balance";
+  const balanceField = sessionType === "individual" ? "individual_balance" : sessionType === "duo" ? "duo_balance" : "collective_balance";
   const currentBalance = sessionType === "individual"
     ? profile.individual_balance
+    : sessionType === "duo"
+    ? profile.duo_balance
     : profile.collective_balance;
 
   await supabase

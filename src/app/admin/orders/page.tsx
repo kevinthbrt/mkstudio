@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
-import { CreditCard, Plus, Download, FileText, Users, Zap } from "lucide-react";
+import { CreditCard, Plus, Download, FileText, Users, Zap, UserPlus } from "lucide-react";
 import { formatDate, formatPriceFromEuros } from "@/lib/utils";
 import type { Product, Profile } from "@/types/database";
 
@@ -103,6 +103,7 @@ export default function OrdersPage() {
 
   const collectiveProducts = products.filter((p) => p.session_type === "collective" || !p.session_type);
   const individualProducts = products.filter((p) => p.session_type === "individual");
+  const duoProducts = products.filter((p) => p.session_type === "duo");
 
   const selectedProduct = products.find((p) => p.id === form.product_id);
 
@@ -141,6 +142,7 @@ export default function OrdersPage() {
         <div className="space-y-2">
           {orders.map((order) => {
             const isIndividual = order.products?.session_type === "individual";
+            const isDuo = order.products?.session_type === "duo";
             return (
               <div
                 key={order.id}
@@ -155,7 +157,7 @@ export default function OrdersPage() {
                   </p>
                   <p className="text-gray-500 text-xs mt-0.5">
                     {order.products?.name} — {order.sessions_purchased} séance(s)
-                    {isIndividual ? " individuelles" : " collectives"}
+                    {isIndividual ? " solo" : isDuo ? " duo" : " collectives"}
                   </p>
                   <p className="text-gray-600 text-xs mt-0.5">
                     {order.invoice_number} — {formatDate(order.created_at)}
@@ -171,7 +173,9 @@ export default function OrdersPage() {
                   <div className="flex gap-1">
                     <Badge variant="green">Payé</Badge>
                     {isIndividual ? (
-                      <Badge variant="blue">Individuel</Badge>
+                      <Badge variant="blue">Solo</Badge>
+                    ) : isDuo ? (
+                      <Badge variant="purple">Duo</Badge>
                     ) : (
                       <Badge variant="gray">Collectif</Badge>
                     )}
@@ -258,7 +262,7 @@ export default function OrdersPage() {
             {individualProducts.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-gray-500 flex items-center gap-1">
-                  <Zap size={11} /> Packs individuels
+                  <Zap size={11} /> Packs solo
                 </p>
                 {individualProducts.map((p) => (
                   <label
@@ -284,6 +288,42 @@ export default function OrdersPage() {
                       </div>
                     </div>
                     <p className="text-blue-400 font-bold text-sm">
+                      {formatPriceFromEuros(p.price)}
+                    </p>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {duoProducts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <UserPlus size={11} /> Packs duo
+                </p>
+                {duoProducts.map((p) => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      form.product_id === p.id
+                        ? "bg-purple-500/10 border-purple-500/40"
+                        : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#3a3a3a]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="product_id"
+                        value={p.id}
+                        checked={form.product_id === p.id}
+                        onChange={() => setForm({ ...form, product_id: p.id })}
+                        className="accent-purple-400"
+                      />
+                      <div>
+                        <p className="text-white text-sm font-medium">{p.name}</p>
+                        <p className="text-gray-500 text-xs">{p.session_count} séances</p>
+                      </div>
+                    </div>
+                    <p className="text-purple-400 font-bold text-sm">
                       {formatPriceFromEuros(p.price)}
                     </p>
                   </label>
@@ -328,8 +368,8 @@ export default function OrdersPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Crédite le solde{" "}
-                <span className={selectedProduct.session_type === "individual" ? "text-blue-400" : "text-[#D4AF37]"}>
-                  {selectedProduct.session_type === "individual" ? "individuel" : "collectif"}
+                <span className={selectedProduct.session_type === "individual" ? "text-blue-400" : selectedProduct.session_type === "duo" ? "text-purple-400" : "text-[#D4AF37]"}>
+                  {selectedProduct.session_type === "individual" ? "solo" : selectedProduct.session_type === "duo" ? "duo" : "collectif"}
                 </span>{" "}
                 de l&apos;adhérent
               </p>

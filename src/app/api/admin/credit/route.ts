@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!["collective", "individual"].includes(session_type)) {
+  if (!["collective", "individual", "duo"].includes(session_type)) {
     return NextResponse.json(
-      { error: "session_type doit être 'collective' ou 'individual'" },
+      { error: "session_type doit être 'collective', 'individual' ou 'duo'" },
       { status: 400 }
     );
   }
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   // Fetch current balance
   const { data: member, error: memberError } = await supabase
     .from("profiles")
-    .select("id, collective_balance, individual_balance")
+    .select("id, collective_balance, individual_balance, duo_balance")
     .eq("id", member_id)
     .single();
 
@@ -58,9 +58,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Adhérent introuvable" }, { status: 404 });
   }
 
-  const field = session_type === "individual" ? "individual_balance" : "collective_balance";
+  const field = session_type === "individual" ? "individual_balance" : session_type === "duo" ? "duo_balance" : "collective_balance";
   const currentBalance = session_type === "individual"
     ? member.individual_balance
+    : session_type === "duo"
+    ? member.duo_balance
     : member.collective_balance;
   const newBalance = Math.max(0, currentBalance + amount);
 

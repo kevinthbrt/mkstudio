@@ -25,9 +25,10 @@ export default function AdminPlanningPage() {
 
   const [sessionForm, setSessionForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual",
+    session_type: "collective" as "collective" | "individual" | "duo",
     assigned_member_id: "",
-    coach_name: "",
+    assigned_member_ids: [] as string[],
+    coach_name: "Manon",
     date: "",
     start_hour: "09:00",
     end_hour: "10:00",
@@ -41,7 +42,7 @@ export default function AdminPlanningPage() {
 
   const [editForm, setEditForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual",
+    session_type: "collective" as "collective" | "individual" | "duo",
     assigned_member_id: "",
     coach_name: "",
     date: "",
@@ -59,6 +60,9 @@ export default function AdminPlanningPage() {
     duration_minutes: "60",
   });
 
+  const [duoMemberSearch, setDuoMemberSearch] = useState("");
+  const [soloMemberSearch, setSoloMemberSearch] = useState("");
+  const [editSoloMemberSearch, setEditSoloMemberSearch] = useState("");
   const [savingSession, setSavingSession] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [cancellingSession, setCancellingSession] = useState(false);
@@ -95,7 +99,7 @@ export default function AdminPlanningPage() {
     setEditingSession(session);
     setEditForm({
       class_type_id: session.class_type_id,
-      session_type: session.session_type,
+      session_type: session.session_type as "collective" | "individual" | "duo",
       assigned_member_id: session.assigned_member_id ?? "",
       coach_name: session.coach_name,
       date: dateStr,
@@ -117,6 +121,7 @@ export default function AdminPlanningPage() {
     const endTime = new Date(`${sessionForm.date}T${sessionForm.end_hour}:00`);
 
     const isIndividual = sessionForm.session_type === "individual";
+    const isDuo = sessionForm.session_type === "duo";
 
     const sessions = [];
 
@@ -200,14 +205,55 @@ export default function AdminPlanningPage() {
       }).catch(() => {});
     }
 
+    if (isDuo && sessionForm.assigned_member_ids.length > 0 && createdSessions) {
+      for (const memberId of sessionForm.assigned_member_ids) {
+        const duoBookings = createdSessions.map((s) => ({
+          member_id: memberId,
+          class_session_id: s.id,
+          status: "confirmed" as const,
+          session_debited: true,
+          booked_at: new Date().toISOString(),
+        }));
+        await supabase.from("class_bookings").insert(duoBookings);
+
+        for (const s of createdSessions) {
+          await supabase.rpc("decrement_duo_balance", { p_member_id: memberId });
+          await supabase.rpc("increment_participants", { session_id: s.id });
+        }
+      }
+
+      // Send booking confirmation emails to all enrolled members
+      const sessionName = classTypes.find((t) => t.id === sessionForm.class_type_id)?.name ?? "Coaching duo";
+      const dateObj = new Date(`${sessionForm.date}T${sessionForm.start_hour}:00`);
+      const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const sessionTime = `${sessionForm.start_hour} – ${sessionForm.end_hour}`;
+      for (const memberId of sessionForm.assigned_member_ids) {
+        fetch("/api/admin/emails/booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memberId,
+            sessionName,
+            sessionDate,
+            sessionTime,
+            coachName: sessionForm.coach_name,
+            recurring: sessionForm.recurring,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     setSavingSession(false);
     setShowCreateSession(false);
+    setDuoMemberSearch("");
+    setSoloMemberSearch("");
     setRefreshKey((k) => k + 1);
     setSessionForm({
       class_type_id: "",
       session_type: "collective",
       assigned_member_id: "",
-      coach_name: "",
+      assigned_member_ids: [],
+      coach_name: "Manon",
       date: "",
       start_hour: "09:00",
       end_hour: "10:00",
@@ -243,6 +289,8 @@ export default function AdminPlanningPage() {
         is_hidden: editForm.is_hidden,
       })
       .eq("id", editingSession.id);
+
+    // Note: for duo sessions, member management is handled via the calendar bookees panel
 
     // If individual session's member changed, update the booking
     if (isIndividual && editForm.assigned_member_id !== (editingSession.assigned_member_id ?? "")) {
@@ -309,6 +357,7 @@ export default function AdminPlanningPage() {
     }
 
     setSavingEdit(false);
+    setEditSoloMemberSearch("");
     setShowEditSession(false);
     setEditingSession(null);
     setRefreshKey((k) => k + 1);
@@ -338,6 +387,8 @@ export default function AdminPlanningPage() {
         if (b.session_debited) {
           const rpcFn = editingSession.session_type === "individual"
             ? "increment_individual_balance"
+            : editingSession.session_type === "duo"
+            ? "increment_duo_balance"
             : "increment_collective_balance";
           await supabase.rpc(rpcFn, { p_member_id: b.member_id });
         }
@@ -416,7 +467,11 @@ export default function AdminPlanningPage() {
   }
 
   const isIndividual = sessionForm.session_type === "individual";
+  const isDuo = sessionForm.session_type === "duo";
+  const isPrivate = isIndividual || isDuo;
   const editIsIndividual = editForm.session_type === "individual";
+  const editIsDuo = editForm.session_type === "duo";
+  const editIsPrivate = editIsIndividual || editIsDuo;
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -424,7 +479,7 @@ export default function AdminPlanningPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Planning</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Gérez les cours collectifs et individuels
+            Gérez les cours collectifs et individuels (solo & duo)
           </p>
         </div>
         <div className="flex gap-2">
@@ -447,6 +502,7 @@ export default function AdminPlanningPage() {
           first_name: m.first_name,
           last_name: m.last_name,
           collective_balance: m.collective_balance,
+          duo_balance: m.duo_balance ?? 0,
         }))}
         onRequestEdit={openEditModal}
         onToggleVisibility={handleToggleVisibility}
@@ -464,48 +520,155 @@ export default function AdminPlanningPage() {
           {/* Session type */}
           <div>
             <p className="text-sm font-medium text-gray-300 mb-2">Type de séance</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setSessionForm({ ...sessionForm, session_type: "collective" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
-                  !isIndividual
+                  sessionForm.session_type === "collective"
                     ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
                     : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
                 }`}
               >
-                Cours collectif
+                Collectif
               </button>
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual", assigned_member_ids: [] })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   isIndividual
                     ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
                     : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
                 }`}
               >
-                Cours individuel
+                Solo
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "duo", assigned_member_id: "" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  isDuo
+                    ? "bg-purple-500/10 border-purple-500/40 text-purple-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Duo
               </button>
             </div>
           </div>
 
           {isIndividual && (
-            <Select
-              label="Adhérent concerné"
-              value={sessionForm.assigned_member_id}
-              onChange={(e) =>
-                setSessionForm({ ...sessionForm, assigned_member_id: e.target.value })
-              }
-              options={[
-                { value: "", label: "Sélectionner un adhérent..." },
-                ...members.map((m) => ({
-                  value: m.id,
-                  label: `${m.first_name} ${m.last_name}`,
-                })),
-              ]}
-              required={isIndividual}
-            />
+            <div>
+              <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+              {sessionForm.assigned_member_id ? (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
+                    {(() => { const m = members.find((m) => m.id === sessionForm.assigned_member_id); return m ? `${m.first_name} ${m.last_name}` : ""; })()}
+                    <button
+                      type="button"
+                      onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: "" }); setSoloMemberSearch(""); }}
+                      className="text-blue-400/60 hover:text-blue-300 ml-0.5 leading-none"
+                    >×</button>
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={soloMemberSearch}
+                    onChange={(e) => setSoloMemberSearch(e.target.value)}
+                    placeholder="Rechercher un adhérent..."
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500/50 placeholder:text-gray-600"
+                  />
+                  {soloMemberSearch.trim().length > 0 && (
+                    <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                      {members
+                        .filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(soloMemberSearch.toLowerCase()))
+                        .slice(0, 8)
+                        .map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: m.id }); setSoloMemberSearch(""); }}
+                            className="w-full text-left px-3 py-2 text-sm text-white hover:bg-blue-500/10 transition-colors"
+                          >
+                            {m.first_name} {m.last_name}
+                          </button>
+                        ))}
+                      {members.filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(soloMemberSearch.toLowerCase())).length === 0 && (
+                        <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {isDuo && (
+            <div>
+              <p className="text-sm font-medium text-gray-300 mb-2">Adhérents à inscrire</p>
+              {/* Selected members chips */}
+              {sessionForm.assigned_member_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {sessionForm.assigned_member_ids.map((id) => {
+                    const m = members.find((m) => m.id === id);
+                    if (!m) return null;
+                    return (
+                      <span key={id} className="flex items-center gap-1 bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs rounded-full px-2.5 py-1">
+                        {m.first_name} {m.last_name}
+                        <button
+                          type="button"
+                          onClick={() => setSessionForm({ ...sessionForm, assigned_member_ids: sessionForm.assigned_member_ids.filter((i) => i !== id) })}
+                          className="text-purple-400/60 hover:text-purple-300 ml-0.5 leading-none"
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Search input */}
+              <input
+                type="text"
+                value={duoMemberSearch}
+                onChange={(e) => setDuoMemberSearch(e.target.value)}
+                placeholder="Rechercher un adhérent..."
+                className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-500/50 placeholder:text-gray-600"
+              />
+              {/* Filtered results */}
+              {duoMemberSearch.trim().length > 0 && (
+                <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                  {members
+                    .filter((m) => {
+                      const q = duoMemberSearch.toLowerCase();
+                      return (
+                        !sessionForm.assigned_member_ids.includes(m.id) &&
+                        (`${m.first_name} ${m.last_name}`).toLowerCase().includes(q)
+                      );
+                    })
+                    .slice(0, 8)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setSessionForm({ ...sessionForm, assigned_member_ids: [...sessionForm.assigned_member_ids, m.id] });
+                          setDuoMemberSearch("");
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-purple-500/10 transition-colors"
+                      >
+                        {m.first_name} {m.last_name}
+                      </button>
+                    ))}
+                  {members.filter((m) => {
+                    const q = duoMemberSearch.toLowerCase();
+                    return !sessionForm.assigned_member_ids.includes(m.id) && (`${m.first_name} ${m.last_name}`).toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <Select
@@ -683,7 +846,20 @@ export default function AdminPlanningPage() {
           {isIndividual && (
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
               <p className="text-xs text-blue-400">
-                ✓ L&apos;adhérent sera automatiquement inscrit et son solde individuel débité
+                ✓ L&apos;adhérent sera automatiquement inscrit et son solde solo débité
+                {sessionForm.recurring
+                  ? sessionForm.infinite_recurrence
+                    ? " pour 104 séances (récurrence infinie)"
+                    : ` pour ${sessionForm.weeks} séances`
+                  : ""}.
+              </p>
+            </div>
+          )}
+
+          {isDuo && (
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+              <p className="text-xs text-purple-400">
+                ✓ Les adhérents sélectionnés seront automatiquement inscrits et leur solde duo débité
                 {sessionForm.recurring
                   ? sessionForm.infinite_recurrence
                     ? " pour 104 séances (récurrence infinie)"
@@ -725,21 +901,72 @@ export default function AdminPlanningPage() {
       >
         {editingSession && (
           <form onSubmit={handleEditSession} className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-lg border ${
+                editIsIndividual
+                  ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                  : editIsDuo
+                  ? "bg-purple-500/10 border-purple-500/30 text-purple-400"
+                  : "bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37]"
+              }`}>
+                {editIsIndividual ? "Coaching solo" : editIsDuo ? "Coaching duo" : "Cours collectif"}
+              </span>
+            </div>
+
             {editIsIndividual && (
-              <Select
-                label="Adhérent concerné"
-                value={editForm.assigned_member_id}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, assigned_member_id: e.target.value })
-                }
-                options={[
-                  { value: "", label: "Aucun adhérent..." },
-                  ...members.map((m) => ({
-                    value: m.id,
-                    label: `${m.first_name} ${m.last_name}`,
-                  })),
-                ]}
-              />
+              <div>
+                <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+                {editForm.assigned_member_id ? (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
+                      {(() => { const m = members.find((m) => m.id === editForm.assigned_member_id); return m ? `${m.first_name} ${m.last_name}` : ""; })()}
+                      <button
+                        type="button"
+                        onClick={() => { setEditForm({ ...editForm, assigned_member_id: "" }); setEditSoloMemberSearch(""); }}
+                        className="text-blue-400/60 hover:text-blue-300 ml-0.5 leading-none"
+                      >×</button>
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={editSoloMemberSearch}
+                      onChange={(e) => setEditSoloMemberSearch(e.target.value)}
+                      placeholder="Rechercher un adhérent..."
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500/50 placeholder:text-gray-600"
+                    />
+                    {editSoloMemberSearch.trim().length > 0 && (
+                      <div className="mt-1 bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                        {members
+                          .filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(editSoloMemberSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => { setEditForm({ ...editForm, assigned_member_id: m.id }); setEditSoloMemberSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm text-white hover:bg-blue-500/10 transition-colors"
+                            >
+                              {m.first_name} {m.last_name}
+                            </button>
+                          ))}
+                        {members.filter((m) => (`${m.first_name} ${m.last_name}`).toLowerCase().includes(editSoloMemberSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-gray-600 italic">Aucun résultat</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {editIsDuo && (
+              <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3">
+                <p className="text-xs text-purple-400">
+                  Coaching duo — les inscriptions sont gérées depuis le calendrier.
+                </p>
+              </div>
             )}
 
             <Select
@@ -830,7 +1057,7 @@ export default function AdminPlanningPage() {
               />
             )}
 
-            {!editIsIndividual && (
+            {!editIsPrivate && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
