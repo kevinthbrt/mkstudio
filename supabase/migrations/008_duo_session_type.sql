@@ -33,7 +33,7 @@ DROP POLICY IF EXISTS "Members can view collective and their individual sessions
 CREATE POLICY "Members can view collective and their private sessions" ON class_sessions
   FOR SELECT USING (
     auth.uid() IS NOT NULL AND (
-      session_type = 'collective'
+      (session_type = 'collective' AND is_hidden = false)
       OR is_admin()
       OR (session_type = 'individual' AND assigned_member_id IN (SELECT id FROM profiles WHERE user_id = auth.uid()))
       OR (session_type = 'duo' AND id IN (

@@ -213,8 +213,9 @@ export default function AdminPlanningPage() {
         }));
         await supabase.from("class_bookings").insert(duoBookings);
 
-        for (let i = 0; i < createdSessions.length; i++) {
+        for (const s of createdSessions) {
           await supabase.rpc("decrement_duo_balance", { p_member_id: memberId });
+          await supabase.rpc("increment_participants", { session_id: s.id });
         }
       }
 

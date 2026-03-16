@@ -362,7 +362,9 @@ export function WeeklyCalendar({
 
   async function handleBook(session: ClassSessionWithType) {
     if (!memberId) return;
-    if (!isAdmin && (session.session_type === "individual" || session.session_type === "duo")) return;
+    if (!isAdmin && session.session_type === "individual") return;
+    // For duo: members can only cancel (not self-book). Block if not already booked.
+    if (!isAdmin && session.session_type === "duo" && bookings[session.id] !== "confirmed") return;
 
     setBooking(true);
     setBookingError("");
