@@ -1,14 +1,14 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Lock, CheckCircle, AlertTriangle } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
@@ -23,12 +23,10 @@ export default function ResetPasswordPage() {
     const code = searchParams.get("code");
 
     if (code) {
-      // PKCE flow: exchange the code for a session
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
         if (!error) setReady(true);
       });
     } else {
-      // Fallback: check if already in a recovery session
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) setReady(true);
       });
@@ -166,5 +164,13 @@ export default function ResetPasswordPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
