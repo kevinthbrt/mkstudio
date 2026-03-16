@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { User, Phone, Mail, Save, CheckCircle, Users, Zap } from "lucide-react";
+import { User, Phone, Mail, Save, CheckCircle, Users, Zap, Lock, AlertTriangle } from "lucide-react";
 import { PushNotificationSetup } from "@/components/PushNotificationSetup";
 import type { Profile } from "@/types/database";
 
@@ -19,6 +19,14 @@ export default function ProfilePage() {
     last_name: "",
     phone: "",
   });
+
+  const [passwordForm, setPasswordForm] = useState({
+    new_password: "",
+    confirm_password: "",
+  });
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -69,6 +77,33 @@ export default function ProfilePage() {
       setProfile({ ...profile, ...form });
     }
     setSaving(false);
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+
+    if (passwordForm.new_password.length < 8) {
+      setPasswordError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setSavingPassword(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.new_password });
+
+    if (error) {
+      setPasswordError(error.message || "Erreur lors de la mise à jour du mot de passe.");
+    } else {
+      setPasswordSuccess(true);
+      setPasswordForm({ new_password: "", confirm_password: "" });
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    }
+    setSavingPassword(false);
   }
 
   if (loading) {
@@ -134,6 +169,50 @@ export default function ProfilePage() {
           </p>
         </div>
         <PushNotificationSetup />
+      </Card>
+
+      {/* Password change */}
+      <Card className="p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Lock size={14} className="text-gray-400" />
+          Changer le mot de passe
+        </h2>
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <Input
+            label="Nouveau mot de passe"
+            type="password"
+            value={passwordForm.new_password}
+            onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+            placeholder="Minimum 8 caractères"
+            icon={<Lock size={14} />}
+            required
+          />
+          <Input
+            label="Confirmer le mot de passe"
+            type="password"
+            value={passwordForm.confirm_password}
+            onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+            placeholder="Répétez le mot de passe"
+            icon={<Lock size={14} />}
+            required
+          />
+          {passwordError && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+              <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
+              <p className="text-sm text-red-400">{passwordError}</p>
+            </div>
+          )}
+          {passwordSuccess && (
+            <div className="flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-2.5">
+              <CheckCircle size={16} />
+              <span className="text-sm">Mot de passe mis à jour !</span>
+            </div>
+          )}
+          <Button type="submit" loading={savingPassword} variant="outline" className="w-full">
+            <Lock size={16} />
+            Mettre à jour le mot de passe
+          </Button>
+        </form>
       </Card>
 
       {/* Edit form */}

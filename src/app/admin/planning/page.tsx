@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { WeeklyCalendar, ClassSessionWithType } from "@/components/planning/WeeklyCalendar";
-import { Plus, Palette, Trash2, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Plus, Palette, Trash2, AlertTriangle, Eye, EyeOff, Pencil } from "lucide-react";
 import type { ClassType, Profile } from "@/types/database";
 
 const COLOR_PRESETS = [
@@ -59,6 +59,15 @@ export default function AdminPlanningPage() {
     color: "#D4AF37",
     duration_minutes: "60",
   });
+
+  const [editingType, setEditingType] = useState<ClassType | null>(null);
+  const [editTypeForm, setEditTypeForm] = useState({
+    name: "",
+    description: "",
+    color: "#D4AF37",
+    duration_minutes: "60",
+  });
+  const [savingEditType, setSavingEditType] = useState(false);
 
   const [duoMemberSearch, setDuoMemberSearch] = useState("");
   const [soloMemberSearch, setSoloMemberSearch] = useState("");
@@ -439,6 +448,34 @@ export default function AdminPlanningPage() {
 
     setSavingType(false);
     setTypeForm({ name: "", description: "", color: "#D4AF37", duration_minutes: "60" });
+    loadClassTypes();
+  }
+
+  function openEditType(type: ClassType) {
+    setEditingType(type);
+    setEditTypeForm({
+      name: type.name,
+      description: type.description || "",
+      color: type.color,
+      duration_minutes: String(type.duration_minutes),
+    });
+  }
+
+  async function handleEditType(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingType) return;
+    setSavingEditType(true);
+
+    const supabase = createClient();
+    await supabase.from("class_types").update({
+      name: editTypeForm.name,
+      description: editTypeForm.description || null,
+      color: editTypeForm.color,
+      duration_minutes: parseInt(editTypeForm.duration_minutes),
+    }).eq("id", editingType.id);
+
+    setSavingEditType(false);
+    setEditingType(null);
     loadClassTypes();
   }
 
@@ -1129,25 +1166,81 @@ export default function AdminPlanningPage() {
           {classTypes.length > 0 && (
             <div className="space-y-2">
               {classTypes.map((type) => (
-                <div
-                  key={type.id}
-                  className="flex items-center gap-3 bg-[#1a1a1a] rounded-lg p-3"
-                >
+                editingType?.id === type.id ? (
+                  <form key={type.id} onSubmit={handleEditType} className="bg-[#1a1a1a] rounded-lg p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Nom"
+                        value={editTypeForm.name}
+                        onChange={(e) => setEditTypeForm({ ...editTypeForm, name: e.target.value })}
+                        required
+                      />
+                      <Input
+                        label="Durée (min)"
+                        type="number"
+                        min="15"
+                        value={editTypeForm.duration_minutes}
+                        onChange={(e) => setEditTypeForm({ ...editTypeForm, duration_minutes: e.target.value })}
+                      />
+                    </div>
+                    <Textarea
+                      label="Description (optionnel)"
+                      value={editTypeForm.description}
+                      onChange={(e) => setEditTypeForm({ ...editTypeForm, description: e.target.value })}
+                      placeholder="Décrivez ce type de cours..."
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Couleur</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {COLOR_PRESETS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setEditTypeForm({ ...editTypeForm, color })}
+                            className={`w-8 h-8 rounded-lg transition-transform hover:scale-110 ${
+                              editTypeForm.color === color ? "ring-2 ring-white ring-offset-2 ring-offset-[#111] scale-110" : ""
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={() => setEditingType(null)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" size="sm" className="flex-1" loading={savingEditType}>
+                        Enregistrer
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
                   <div
-                    className="w-4 h-4 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: type.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium">{type.name}</p>
-                    <p className="text-gray-500 text-xs">{type.duration_minutes} min</p>
-                  </div>
-                  <button
-                    onClick={() => deleteClassType(type.id)}
-                    className="text-gray-600 hover:text-red-400 transition-colors"
+                    key={type.id}
+                    className="flex items-center gap-3 bg-[#1a1a1a] rounded-lg p-3"
                   >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: type.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium">{type.name}</p>
+                      <p className="text-gray-500 text-xs">{type.duration_minutes} min</p>
+                    </div>
+                    <button
+                      onClick={() => openEditType(type)}
+                      className="text-gray-600 hover:text-[#D4AF37] transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteClassType(type.id)}
+                      className="text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )
               ))}
             </div>
           )}

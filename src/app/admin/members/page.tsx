@@ -22,6 +22,10 @@ import {
   Calendar,
   XCircle,
   Clock,
+  Save,
+  CheckCircle,
+  Lock,
+  User,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Profile } from "@/types/database";
@@ -77,7 +81,18 @@ export default function MembersPage() {
   // Member history
   const [memberHistory, setMemberHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"info" | "history">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "history" | "edit" | "password">("info");
+
+  // Edit member
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", phone: "", date_of_birth: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  // Reset member password
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   const [newMember, setNewMember] = useState({
     first_name: "",
@@ -227,13 +242,78 @@ export default function MembersPage() {
     setAdjustDelta(1);
     setActiveTab("info");
     setMemberHistory([]);
+    setEditForm({
+      first_name: member.first_name,
+      last_name: member.last_name,
+      phone: (member as any).phone || "",
+      date_of_birth: (member as any).date_of_birth || "",
+    });
+    setEditSuccess(false);
+    setNewPassword("");
+    setPasswordSuccess(false);
+    setPasswordError("");
   }
 
-  function handleTabChange(tab: "info" | "history") {
+  function handleTabChange(tab: "info" | "history" | "edit" | "password") {
     setActiveTab(tab);
     if (tab === "history" && selectedMember && memberHistory.length === 0) {
       loadMemberHistory(selectedMember.id);
     }
+  }
+
+  async function handleEditMember(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedMember) return;
+    setSavingEdit(true);
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        phone: editForm.phone || null,
+        date_of_birth: editForm.date_of_birth || null,
+      })
+      .eq("id", selectedMember.id);
+
+    if (!error) {
+      const updated = {
+        ...selectedMember,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        phone: editForm.phone || null,
+        date_of_birth: editForm.date_of_birth || null,
+      } as Profile;
+      setMembers((m) => m.map((mb) => (mb.id === selectedMember.id ? updated : mb)));
+      setSelectedMember(updated);
+      setEditSuccess(true);
+      setTimeout(() => setEditSuccess(false), 3000);
+    }
+    setSavingEdit(false);
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedMember || !newPassword) return;
+    setSavingPassword(true);
+    setPasswordError("");
+
+    const res = await fetch("/api/admin/members/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member_id: selectedMember.id, new_password: newPassword }),
+    });
+
+    if (res.ok) {
+      setPasswordSuccess(true);
+      setNewPassword("");
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } else {
+      const data = await res.json();
+      setPasswordError(data.error || "Erreur lors de la mise à jour du mot de passe.");
+    }
+    setSavingPassword(false);
   }
 
   const filtered = members.filter((m) => {
@@ -443,20 +523,40 @@ export default function MembersPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1">
+            <div className="flex gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 flex-wrap">
               <button
                 onClick={() => handleTabChange("info")}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors min-w-[60px] ${
                   activeTab === "info"
                     ? "bg-[#1a1a1a] text-white"
                     : "text-gray-500 hover:text-gray-300"
                 }`}
               >
-                Soldes & Actions
+                Soldes
+              </button>
+              <button
+                onClick={() => handleTabChange("edit")}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors min-w-[60px] ${
+                  activeTab === "edit"
+                    ? "bg-[#1a1a1a] text-white"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Éditer
+              </button>
+              <button
+                onClick={() => handleTabChange("password")}
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors min-w-[60px] ${
+                  activeTab === "password"
+                    ? "bg-[#1a1a1a] text-white"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                M.d.passe
               </button>
               <button
                 onClick={() => handleTabChange("history")}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors min-w-[60px] ${
                   activeTab === "history"
                     ? "bg-[#1a1a1a] text-white"
                     : "text-gray-500 hover:text-gray-300"
@@ -678,6 +778,86 @@ export default function MembersPage() {
                   Inscrit le {formatDate(selectedMember.created_at)}
                 </div>
               </>
+            )}
+
+            {/* Edit tab */}
+            {activeTab === "edit" && (
+              <form onSubmit={handleEditMember} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Prénom"
+                    value={editForm.first_name}
+                    onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                    icon={<User size={14} />}
+                    required
+                  />
+                  <Input
+                    label="Nom"
+                    value={editForm.last_name}
+                    onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <Input
+                  label="Téléphone"
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  icon={<Phone size={14} />}
+                  placeholder="+33 6 00 00 00 00"
+                />
+                <Input
+                  label="Date de naissance"
+                  type="date"
+                  value={editForm.date_of_birth}
+                  onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                />
+                {editSuccess && (
+                  <div className="flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-2.5">
+                    <CheckCircle size={16} />
+                    <span className="text-sm">Informations mises à jour !</span>
+                  </div>
+                )}
+                <Button type="submit" loading={savingEdit} className="w-full">
+                  <Save size={16} />
+                  Enregistrer
+                </Button>
+              </form>
+            )}
+
+            {/* Password tab */}
+            {activeTab === "password" && (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <p className="text-xs text-amber-400">
+                    Définissez un nouveau mot de passe pour cet adhérent. Il pourra le modifier depuis son profil.
+                  </p>
+                </div>
+                <Input
+                  label="Nouveau mot de passe"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  icon={<Lock size={14} />}
+                  placeholder="Minimum 8 caractères"
+                  required
+                />
+                {passwordError && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+                    <p className="text-sm text-red-400">{passwordError}</p>
+                  </div>
+                )}
+                {passwordSuccess && (
+                  <div className="flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-2.5">
+                    <CheckCircle size={16} />
+                    <span className="text-sm">Mot de passe mis à jour !</span>
+                  </div>
+                )}
+                <Button type="submit" loading={savingPassword} className="w-full" disabled={newPassword.length < 8}>
+                  <Lock size={16} />
+                  Mettre à jour le mot de passe
+                </Button>
+              </form>
             )}
 
             {/* History tab */}

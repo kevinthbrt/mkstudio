@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
   // If env vars are missing, fail closed — redirect to login for all protected routes
   if (!supabaseUrl || !supabaseAnonKey) {
     const pathname = request.nextUrl.pathname;
-    const publicRoutes = ["/login", "/register", "/"];
+    const publicRoutes = ["/login", "/register", "/", "/forgot-password", "/reset-password"];
     if (!publicRoutes.includes(pathname) && !pathname.startsWith("/api/cron/")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname;
 
-    const publicRoutes = ["/login", "/register", "/"];
+    const publicRoutes = ["/login", "/register", "/", "/forgot-password", "/reset-password"];
     const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith("/api/cron/");
     const isAuthRoute = pathname === "/login" || pathname === "/register";
 
@@ -68,7 +68,7 @@ export async function middleware(request: NextRequest) {
   } catch {
     // On error, redirect to login for protected routes
     const pathname = request.nextUrl.pathname;
-    const publicRoutes = ["/login", "/register", "/"];
+    const publicRoutes = ["/login", "/register", "/", "/forgot-password", "/reset-password"];
     if (!publicRoutes.includes(pathname) && !pathname.startsWith("/api/cron/")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

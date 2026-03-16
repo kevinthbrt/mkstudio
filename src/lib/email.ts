@@ -3,8 +3,8 @@ import { Resend } from "resend";
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY ?? "");
 }
-const FROM = process.env.RESEND_FROM_EMAIL ?? "MK Studio <noreply@mkstudio.fr>";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mkstudio.fr";
+const FROM = process.env.RESEND_FROM_EMAIL ?? "MK Studio <noreply@mkstudio-training.fr>";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mkstudio-training.fr";
 
 // ─── Shared layout ────────────────────────────────────────────────────────────
 function layout(content: string): string {

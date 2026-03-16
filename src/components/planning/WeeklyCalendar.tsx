@@ -787,6 +787,24 @@ export function WeeklyCalendar({
                             Coaching duo · {session.current_participants}/{session.max_participants}
                           </p>
                         )}
+                        {/* Booking CTA for members - collective sessions only */}
+                        {!isAdmin && memberId && !past && !isBooked && !isFull && session.session_type === "collective" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSession(session);
+                              setBookingError("");
+                            }}
+                            className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                            style={{
+                              backgroundColor: session.class_types.color + "20",
+                              color: session.class_types.color,
+                              border: `1px solid ${session.class_types.color}40`,
+                            }}
+                          >
+                            Réserver ma place →
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -824,6 +842,7 @@ export function WeeklyCalendar({
                     const isDuo = session.session_type === "duo";
                     const isHidden = session.is_hidden;
                     const past = isPast(session);
+                    const isFull = session.current_participants >= session.max_participants;
 
                     return (
                       <div
@@ -881,6 +900,14 @@ export function WeeklyCalendar({
                           <div className="mt-1">
                             <Badge variant="green">✓</Badge>
                           </div>
+                        )}
+                        {!isAdmin && memberId && !past && !isBooked && !isFull && session.session_type === "collective" && (
+                          <p
+                            className="text-xs mt-1 font-semibold"
+                            style={{ color: session.class_types.color }}
+                          >
+                            Réserver →
+                          </p>
                         )}
                       </div>
                     );
