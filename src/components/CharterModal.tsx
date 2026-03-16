@@ -43,15 +43,23 @@ const CHARTER_SECTIONS = [
     ],
   },
   {
-    title: "5. Respect des locaux et du matériel",
+    title: "5. Accès à l'espace sportif et aux machines",
     items: [
+      "L'accès à l'espace sportif et aux machines se fait uniquement en présence du coach. Il est strictement interdit d'utiliser une machine sans la présence ou l'accord préalable du coach.",
       "Le matériel mis à disposition doit être utilisé correctement et rangé après chaque utilisation.",
       "Merci de nettoyer le matériel après usage (tapis, machines, accessoires).",
       "Toute dégradation volontaire du matériel ou des locaux pourra entraîner des frais de réparation à la charge de l'adhérent.",
     ],
   },
   {
-    title: "6. Respect et savoir-vivre",
+    title: "6. Rangement des affaires personnelles",
+    items: [
+      "Chaque adhérent doit veiller au rangement de ses propres affaires. Des rangements sont mis à disposition à l'entrée de la salle.",
+      "Merci de ne pas laisser traîner vos affaires sur les chaises et fauteuils réservés à l'attente des autres adhérents.",
+    ],
+  },
+  {
+    title: "7. Respect et savoir-vivre",
     items: [
       "Un comportement respectueux envers le coach, le personnel et les autres adhérents est exigé en toutes circonstances.",
       "Le volume sonore des conversations et appareils doit rester raisonnable.",
@@ -59,7 +67,7 @@ const CHARTER_SECTIONS = [
     ],
   },
   {
-    title: "7. Responsabilité et santé",
+    title: "8. Responsabilité et santé",
     items: [
       "Chaque adhérent pratique sous sa propre responsabilité. Il est recommandé de consulter un médecin avant de débuter toute activité sportive.",
       "En cas de problème de santé, blessure ou condition particulière, merci d'en informer votre coach avant le début du cours.",
@@ -67,7 +75,7 @@ const CHARTER_SECTIONS = [
     ],
   },
   {
-    title: "8. Objets personnels",
+    title: "9. Objets personnels",
     items: [
       "MK Studio ne peut être tenu responsable de la perte ou du vol d'objets personnels au sein de l'établissement.",
       "Merci de ne pas laisser d'objets de valeur sans surveillance.",
