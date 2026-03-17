@@ -538,7 +538,7 @@ function InvoicePDF({
         settings.stamp_url
           ? React.createElement(Image, {
               src: settings.stamp_url,
-              style: { width: 100, height: 100, marginBottom: 8 },
+              style: { width: 100, marginBottom: 8 },
             })
           : null,
 
