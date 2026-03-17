@@ -1,8 +1,8 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -10,28 +10,24 @@ import { Lock, CheckCircle, AlertTriangle } from "lucide-react";
 
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    const code = searchParams.get("code");
 
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (!error) setReady(true);
-      });
-    } else {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) setReady(true);
-      });
-    }
-  }, [searchParams]);
+    // The code exchange is handled server-side by /api/auth/callback
+    // Here we just need to check if the session is ready
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true);
+      setChecking(false);
+    });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -93,7 +89,12 @@ function ResetPasswordForm() {
             backdropFilter: "blur(20px)",
           }}
         >
-          {success ? (
+          {checking ? (
+            <div className="text-center py-8">
+              <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-gray-400 text-sm mt-4">Vérification en cours...</p>
+            </div>
+          ) : success ? (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto">
                 <CheckCircle size={32} className="text-green-400" />
@@ -168,9 +169,5 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
-  return (
-    <Suspense>
-      <ResetPasswordForm />
-    </Suspense>
-  );
+  return <ResetPasswordForm />;
 }
