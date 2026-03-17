@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     | "magiclink"
     | null;
   const next = requestUrl.searchParams.get("next") ?? "/dashboard";
-  const origin = requestUrl.origin;
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin;
 
   if (token_hash && type) {
     const cookieStore = await cookies();
