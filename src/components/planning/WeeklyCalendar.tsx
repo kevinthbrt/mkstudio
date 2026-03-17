@@ -106,6 +106,8 @@ export function WeeklyCalendar({
   const [adminBookingMemberId, setAdminBookingMemberId] = useState("");
   const [adminBooking, setAdminBooking] = useState(false);
   const [adminBookingError, setAdminBookingError] = useState("");
+  const [waitlists, setWaitlists] = useState<Record<string, number>>({});
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -177,6 +179,19 @@ export function WeeklyCalendar({
         });
         setBookings(bookingMap);
         setBookingGuests(guestMap);
+
+        // Load waitlist entries for this member
+        const { data: waitlistData } = await supabase
+          .from("class_waitlists")
+          .select("class_session_id, position")
+          .eq("member_id", memberId)
+          .eq("status", "waiting");
+
+        const waitlistMap: Record<string, number> = {};
+        (waitlistData || []).forEach((w: any) => {
+          waitlistMap[w.class_session_id] = w.position;
+        });
+        setWaitlists(waitlistMap);
 
         // Members only see individual/duo sessions they are enrolled in
         setSessions(
@@ -376,7 +391,79 @@ export function WeeklyCalendar({
       prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - totalRefund) } : null
     );
 
+    // Trigger waitlist promotion
+    fetch("/api/waitlist/promote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id }),
+    }).catch(() => {});
+
     setAdminBooking(false);
+  }
+
+  async function handleJoinWaitlist(session: ClassSessionWithType) {
+    if (!memberId) return;
+    setWaitlistLoading(true);
+    setBookingError("");
+
+    const supabase = createClient();
+
+    const { data: position, error } = await supabase.rpc("join_waitlist", {
+      p_member_id: memberId,
+      p_session_id: session.id,
+    });
+
+    if (error || position == null) {
+      setBookingError("Impossible de rejoindre la liste d'attente. Réessayez.");
+      setWaitlistLoading(false);
+      return;
+    }
+
+    setWaitlists((w) => ({ ...w, [session.id]: position }));
+
+    // Send confirmation email (non-blocking)
+    fetch("/api/emails/waitlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionName: session.class_types.name,
+        sessionDate: formatDate(session.start_time),
+        sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+        coachName: session.coach_name,
+        position,
+      }),
+    }).catch(() => {});
+
+    setWaitlistLoading(false);
+  }
+
+  async function handleLeaveWaitlist(session: ClassSessionWithType) {
+    if (!memberId) return;
+    setWaitlistLoading(true);
+    setBookingError("");
+
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("class_waitlists")
+      .update({ status: "cancelled" })
+      .eq("member_id", memberId)
+      .eq("class_session_id", session.id)
+      .eq("status", "waiting");
+
+    if (error) {
+      setBookingError("Impossible de quitter la liste d'attente. Réessayez.");
+      setWaitlistLoading(false);
+      return;
+    }
+
+    setWaitlists((w) => {
+      const next = { ...w };
+      delete next[session.id];
+      return next;
+    });
+
+    setWaitlistLoading(false);
   }
 
   function parseFriends(raw: string): string[] {
@@ -491,6 +578,13 @@ export function WeeklyCalendar({
           }),
         }).catch(() => {});
       }
+
+      // Trigger waitlist promotion: auto-book next person in queue
+      fetch("/api/waitlist/promote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id }),
+      }).catch(() => {});
     } else {
       const guests = inviteFriends ? parseFriends(friendNames) : [];
       const totalSpots = 1 + guests.length;
@@ -624,12 +718,14 @@ export function WeeklyCalendar({
 
   function getSessionBadge(session: ClassSessionWithType) {
     const isBooked = bookings[session.id] === "confirmed";
+    const onWaitlist = waitlists[session.id] != null;
     const isFull = session.current_participants >= session.max_participants;
     const isIndividual = session.session_type === "individual";
     const isDuo = session.session_type === "duo";
 
     if (isPast(session)) return <Badge variant="gray">Terminé</Badge>;
     if (isBooked) return <Badge variant="green">Inscrit</Badge>;
+    if (onWaitlist) return <Badge variant="orange">#{waitlists[session.id]} liste d&apos;attente</Badge>;
     if (isIndividual) return <Badge variant="blue">Solo</Badge>;
     if (isDuo) return <Badge variant="purple">Duo</Badge>;
     if (isFull) return <Badge variant="red">Complet</Badge>;
@@ -718,6 +814,7 @@ export function WeeklyCalendar({
 
               {daySessions.map((session) => {
                 const isBooked = bookings[session.id] === "confirmed";
+                const onWaitlist = waitlists[session.id] != null;
                 const isFull = session.current_participants >= session.max_participants;
                 const isIndividual = session.session_type === "individual";
                 const isDuo = session.session_type === "duo";
@@ -734,6 +831,8 @@ export function WeeklyCalendar({
                         ? "bg-[#111111] border-[#2a2a2a] border-dashed opacity-60"
                         : isBooked
                         ? "bg-[#D4AF37]/10 border-[#D4AF37]/30"
+                        : onWaitlist
+                        ? "bg-orange-500/10 border-orange-500/30"
                         : isIndividual
                         ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
                         : isDuo
@@ -788,23 +887,39 @@ export function WeeklyCalendar({
                             Coaching duo · {session.current_participants}/{session.max_participants}
                           </p>
                         )}
-                        {/* Booking CTA for members - collective sessions only */}
-                        {!isAdmin && memberId && !past && !isBooked && !isFull && session.session_type === "collective" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSession(session);
-                              setBookingError("");
-                            }}
-                            className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                            style={{
-                              backgroundColor: session.class_types.color + "20",
-                              color: session.class_types.color,
-                              border: `1px solid ${session.class_types.color}40`,
-                            }}
-                          >
-                            Réserver ma place →
-                          </button>
+                        {/* Booking / waitlist CTA for members - collective sessions only */}
+                        {!isAdmin && memberId && !past && !isBooked && session.session_type === "collective" && (
+                          <>
+                            {!isFull && !onWaitlist && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSession(session);
+                                  setBookingError("");
+                                }}
+                                className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                                style={{
+                                  backgroundColor: session.class_types.color + "20",
+                                  color: session.class_types.color,
+                                  border: `1px solid ${session.class_types.color}40`,
+                                }}
+                              >
+                                Réserver ma place →
+                              </button>
+                            )}
+                            {isFull && !onWaitlist && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSession(session);
+                                  setBookingError("");
+                                }}
+                                className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/25 transition-colors hover:bg-orange-500/20"
+                              >
+                                Liste d&apos;attente →
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -839,6 +954,7 @@ export function WeeklyCalendar({
                 <div className="space-y-1.5">
                   {daySessions.map((session) => {
                     const isBooked = bookings[session.id] === "confirmed";
+                    const onWaitlist = waitlists[session.id] != null;
                     const isIndividual = session.session_type === "individual";
                     const isDuo = session.session_type === "duo";
                     const isHidden = session.is_hidden;
@@ -902,12 +1018,22 @@ export function WeeklyCalendar({
                             <Badge variant="green">✓</Badge>
                           </div>
                         )}
-                        {!isAdmin && memberId && !past && !isBooked && !isFull && session.session_type === "collective" && (
+                        {!isAdmin && onWaitlist && (
+                          <div className="mt-1">
+                            <Badge variant="orange">#{waitlists[session.id]}</Badge>
+                          </div>
+                        )}
+                        {!isAdmin && memberId && !past && !isBooked && !onWaitlist && !isFull && session.session_type === "collective" && (
                           <p
                             className="text-xs mt-1 font-semibold"
                             style={{ color: session.class_types.color }}
                           >
                             Réserver →
+                          </p>
+                        )}
+                        {!isAdmin && memberId && !past && !isBooked && !onWaitlist && isFull && session.session_type === "collective" && (
+                          <p className="text-xs mt-1 font-semibold text-orange-400">
+                            Attente →
                           </p>
                         )}
                       </div>
@@ -931,6 +1057,7 @@ export function WeeklyCalendar({
             setFriendNames("");
             setAdminBookingMemberId("");
             setAdminBookingError("");
+            setWaitlistLoading(false);
           }}
           title={selectedSession.class_types.name}
         >
@@ -1052,6 +1179,45 @@ export function WeeklyCalendar({
                         : " (1 séance remboursée)"}
                     </Button>
                   </div>
+                ) : waitlists[selectedSession.id] != null ? (
+                  // Member is on the waitlist
+                  <div className="space-y-2">
+                    <div className="bg-orange-500/10 border border-orange-500/25 rounded-lg p-3 space-y-1">
+                      <p className="text-sm font-semibold text-orange-400">
+                        Position #{waitlists[selectedSession.id]} sur la liste d&apos;attente
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Si une place se libère, tu seras inscrit(e) automatiquement et une séance sera débitée.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full text-gray-400 border-gray-400/30 hover:bg-gray-400/10"
+                      onClick={() => handleLeaveWaitlist(selectedSession)}
+                      loading={waitlistLoading}
+                    >
+                      Quitter la liste d&apos;attente
+                    </Button>
+                  </div>
+                ) : selectedSession.current_participants >= selectedSession.max_participants ? (
+                  // Session full — offer waitlist
+                  <div className="space-y-2">
+                    <div className="bg-orange-500/10 border border-orange-500/25 rounded-lg p-3">
+                      <p className="text-xs text-orange-400 leading-relaxed">
+                        Ce cours est complet. Rejoins la liste d&apos;attente : si une place se libère, tu seras inscrit(e) automatiquement (1 séance débitée).
+                      </p>
+                    </div>
+                    <Button
+                      className="w-full bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30"
+                      onClick={() => handleJoinWaitlist(selectedSession)}
+                      loading={waitlistLoading}
+                      disabled={localCollectiveBalance <= 0}
+                    >
+                      {localCollectiveBalance <= 0
+                        ? "Solde insuffisant pour la liste d'attente"
+                        : "Rejoindre la liste d'attente"}
+                    </Button>
+                  </div>
                 ) : (
                   <>
                     {/* Invite friends */}
@@ -1087,14 +1253,9 @@ export function WeeklyCalendar({
                       className="w-full"
                       onClick={() => handleBook(selectedSession)}
                       loading={booking}
-                      disabled={
-                        selectedSession.current_participants >= selectedSession.max_participants ||
-                        localCollectiveBalance <= 0
-                      }
+                      disabled={localCollectiveBalance <= 0}
                     >
-                      {selectedSession.current_participants >= selectedSession.max_participants
-                        ? "Cours complet"
-                        : inviteFriends && parseFriends(friendNames).length > 0
+                      {inviteFriends && parseFriends(friendNames).length > 0
                         ? `S'inscrire avec ${parseFriends(friendNames).length} ami(e)(s) (${1 + parseFriends(friendNames).length} séances)`
                         : "S'inscrire (1 séance collective)"}
                     </Button>

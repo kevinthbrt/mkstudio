@@ -332,6 +332,28 @@ export interface Database {
         };
         Relationships: [];
       };
+      class_waitlists: {
+        Row: {
+          id: string;
+          member_id: string;
+          class_session_id: string;
+          position: number;
+          status: "waiting" | "promoted" | "cancelled";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          class_session_id: string;
+          position: number;
+          status?: "waiting" | "promoted" | "cancelled";
+          created_at?: string;
+        };
+        Update: {
+          status?: "waiting" | "promoted" | "cancelled";
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]?: never;
@@ -381,6 +403,14 @@ export interface Database {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      join_waitlist: {
+        Args: { p_member_id: string; p_session_id: string };
+        Returns: number;
+      };
+      get_waitlist_count: {
+        Args: { p_session_id: string };
+        Returns: number;
+      };
     };
     Enums: {
       [_ in never]?: never;
@@ -398,3 +428,4 @@ export type InvoiceSettings = Database["public"]["Tables"]["invoice_settings"]["
 export type ClassType = Database["public"]["Tables"]["class_types"]["Row"];
 export type ClassSession = Database["public"]["Tables"]["class_sessions"]["Row"];
 export type ClassBooking = Database["public"]["Tables"]["class_bookings"]["Row"];
+export type WaitlistEntry = Database["public"]["Tables"]["class_waitlists"]["Row"];

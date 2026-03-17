@@ -363,3 +363,106 @@ export async function sendSessionReminderEmail(params: {
     html,
   });
 }
+
+// ─── Waitlist confirmation email ───────────────────────────────────────────────
+export async function sendWaitlistConfirmationEmail({
+  to,
+  firstName,
+  sessionName,
+  sessionDate,
+  sessionTime,
+  coachName,
+  position,
+}: {
+  to: string;
+  firstName: string;
+  sessionName: string;
+  sessionDate: string;
+  sessionTime: string;
+  coachName: string;
+  position: number;
+}) {
+  const html = layout(`
+    <div style="display:inline-block;background:#d9770622;border:1px solid #d9770644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#fb923c;font-size:13px;font-weight:600;">⏳ Liste d'attente</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, tu es inscrit(e) sur la liste d'attente.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+      ${infoRow("Coach", coachName)}
+      ${infoRow("Ta position", `#${position}`)}
+    </table>
+    ${divider()}
+    <div style="background:#d9770611;border:1px solid #d9770633;border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+      <p style="color:#fb923c;font-size:13px;margin:0;line-height:1.6;">
+        Si une place se libère, tu seras automatiquement inscrit(e) et une séance sera débitée de ton solde. Tu recevras une notification et un email de confirmation.
+      </p>
+    </div>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">
+      Tu peux quitter la liste d'attente à tout moment depuis le planning.
+    </p>
+    <div style="text-align:center;">
+      ${btn("Voir le planning", `${SITE_URL}/dashboard/planning`)}
+    </div>
+  `);
+
+  return getResend().emails.send({
+    from: FROM,
+    to,
+    subject: `Liste d'attente — ${sessionName} le ${sessionDate}`,
+    html,
+  });
+}
+
+// ─── Waitlist promoted email ────────────────────────────────────────────────────
+export async function sendWaitlistPromotedEmail({
+  to,
+  firstName,
+  sessionName,
+  sessionDate,
+  sessionTime,
+  coachName,
+  minCancelHours,
+}: {
+  to: string;
+  firstName: string;
+  sessionName: string;
+  sessionDate: string;
+  sessionTime: string;
+  coachName: string;
+  minCancelHours: number;
+}) {
+  const html = layout(`
+    <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#4ade80;font-size:13px;font-weight:600;">🎉 Place obtenue !</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonne nouvelle ${firstName} ! Une place s'est libérée et tu es inscrit(e) automatiquement.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+      ${infoRow("Coach", coachName)}
+      ${infoRow("Séance débitée", "1 séance collective")}
+    </table>
+    ${divider()}
+    <div style="background:#d9770611;border:1px solid #d9770633;border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+      <p style="color:#fb923c;font-size:13px;margin:0;line-height:1.6;">
+        ⚠️ Annulation possible jusqu'à <strong>${minCancelHours}h avant</strong> le cours. Passé ce délai, la séance ne sera pas remboursée.
+      </p>
+    </div>
+    <div style="text-align:center;">
+      ${btn("Voir mon planning", `${SITE_URL}/dashboard/planning`)}
+    </div>
+  `);
+
+  return getResend().emails.send({
+    from: FROM,
+    to,
+    subject: `✅ Tu es inscrit(e) — ${sessionName} le ${sessionDate}`,
+    html,
+  });
+}
