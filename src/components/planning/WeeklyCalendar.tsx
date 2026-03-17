@@ -108,6 +108,8 @@ export function WeeklyCalendar({
   const [adminBookingError, setAdminBookingError] = useState("");
   const [waitlists, setWaitlists] = useState<Record<string, number>>({});
   const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [adminWaitlist, setAdminWaitlist] = useState<{ id: string; position: number; member_id: string; name: string }[]>([]);
+  const [loadingAdminWaitlist, setLoadingAdminWaitlist] = useState(false);
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -207,6 +209,31 @@ export function WeeklyCalendar({
     }
 
     setLoading(false);
+  }
+
+  async function refreshSessionParticipants(sessionId: string) {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("class_sessions")
+      .select("current_participants, max_participants")
+      .eq("id", sessionId)
+      .single();
+    if (data) {
+      setSessions((s) =>
+        s.map((sess) => sess.id === sessionId ? { ...sess, ...data } : sess)
+      );
+      setSelectedSession((prev) =>
+        prev ? { ...prev, ...data } : null
+      );
+    }
+  }
+
+  async function loadAdminWaitlist(sessionId: string) {
+    setLoadingAdminWaitlist(true);
+    const res = await fetch(`/api/admin/waitlist?session_id=${sessionId}`);
+    const data = await res.json();
+    setAdminWaitlist(Array.isArray(data) ? data : []);
+    setLoadingAdminWaitlist(false);
   }
 
   async function loadSessionBookees(sessionId: string) {
@@ -396,6 +423,11 @@ export function WeeklyCalendar({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId: session.id }),
+    }).then(() => {
+      // Refresh waitlist display after promotion attempt
+      if (session.session_type === "collective") {
+        loadAdminWaitlist(session.id);
+      }
     }).catch(() => {});
 
     setAdminBooking(false);
@@ -876,8 +908,11 @@ export function WeeklyCalendar({
                       setSelectedSession(session);
                       setBookingError("");
                       setSessionBookees([]);
+                      setAdminWaitlist([]);
                       if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
                         loadSessionBookees(session.id);
+                        refreshSessionParticipants(session.id);
+                        if (session.session_type === "collective") loadAdminWaitlist(session.id);
                       }
                     }}
                   >
@@ -1018,6 +1053,12 @@ export function WeeklyCalendar({
                         onClick={() => {
                           setSelectedSession(session);
                           setBookingError("");
+                          setAdminWaitlist([]);
+                          if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
+                            loadSessionBookees(session.id);
+                            refreshSessionParticipants(session.id);
+                            if (session.session_type === "collective") loadAdminWaitlist(session.id);
+                          }
                         }}
                       >
                         <div className="flex items-center gap-1">
@@ -1091,6 +1132,7 @@ export function WeeklyCalendar({
             setAdminBookingMemberId("");
             setAdminBookingError("");
             setWaitlistLoading(false);
+            setAdminWaitlist([]);
           }}
           title={selectedSession.class_types.name}
         >
@@ -1383,6 +1425,32 @@ export function WeeklyCalendar({
                         <p className="text-xs text-gray-600 italic">Aucun inscrit</p>
                       )}
                     </div>
+
+                    {/* Waitlist section (collective only) */}
+                    {selectedSession.session_type === "collective" && (
+                      <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-orange-400" />
+                          <p className="text-xs font-medium text-orange-400">
+                            Liste d&apos;attente ({adminWaitlist.length})
+                          </p>
+                        </div>
+                        {loadingAdminWaitlist ? (
+                          <p className="text-xs text-gray-600">Chargement...</p>
+                        ) : adminWaitlist.length > 0 ? (
+                          <ul className="space-y-1">
+                            {adminWaitlist.map((w) => (
+                              <li key={w.id} className="text-xs text-gray-300 flex items-center gap-2">
+                                <span className="text-orange-400 font-mono font-semibold w-5">#{w.position}</span>
+                                <span>{w.name}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-gray-600 italic">Liste d&apos;attente vide</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Admin book for member */}
                     {!isPast(selectedSession) && adminMembers.length > 0 && (

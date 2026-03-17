@@ -17,13 +17,21 @@ export async function POST(request: NextRequest) {
   const adminClient = createAdminClient();
 
   // Get session info
-  const { data: session } = await adminClient
+  const { data: session, error: sessionError } = await adminClient
     .from("class_sessions")
-    .select("id, start_time, end_time, coach_name, min_cancel_hours, current_participants, max_participants, class_types(name)")
+    .select("id, start_time, end_time, coach_name, min_cancel_hours, current_participants, max_participants, class_type_id")
     .eq("id", sessionId)
     .single();
 
+  if (sessionError) console.error("[waitlist/promote] session fetch error:", sessionError.message);
   if (!session) return NextResponse.json({ error: "Session introuvable" }, { status: 404 });
+
+  // Fetch class type name separately to avoid FK join issues
+  const { data: classType } = await adminClient
+    .from("class_types")
+    .select("name")
+    .eq("id", session.class_type_id)
+    .single();
 
   // Re-check there is a free spot (the cancellation should have freed one)
   if (session.current_participants >= session.max_participants) {
@@ -90,13 +98,18 @@ export async function POST(request: NextRequest) {
         { onConflict: "member_id,class_session_id" }
       );
 
-    if (bookError) continue;
+    if (bookError) {
+      console.error("[waitlist/promote] booking upsert error:", bookError.message);
+      continue;
+    }
 
     // Deduct 1 collective session
-    await adminClient.rpc("decrement_collective_balance", { p_member_id: entry.member_id });
+    const { error: balanceError } = await adminClient.rpc("decrement_collective_balance", { p_member_id: entry.member_id });
+    if (balanceError) console.error("[waitlist/promote] decrement_collective_balance error:", balanceError.message);
 
     // Increment participants counter
-    await adminClient.rpc("increment_participants", { session_id: sessionId });
+    const { error: participantsError } = await adminClient.rpc("increment_participants", { session_id: sessionId });
+    if (participantsError) console.error("[waitlist/promote] increment_participants error:", participantsError.message);
 
     // Mark waitlist entry as promoted
     await adminClient
@@ -107,7 +120,7 @@ export async function POST(request: NextRequest) {
     // Send confirmation email (non-blocking)
     const sessionDate = formatDate(session.start_time);
     const sessionTime = `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`;
-    const sessionName = (session.class_types as unknown as { name: string }).name;
+    const sessionName = classType?.name ?? "Cours";
 
     sendWaitlistPromotedEmail({
       to: memberProfile.email,

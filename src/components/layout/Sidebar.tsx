@@ -52,6 +52,23 @@ export function Sidebar({ role, userName }: SidebarProps) {
   const nav = role === "admin" ? adminNav : memberNav;
 
   async function handleSignOut() {
+    // Remove push subscription for this device before logging out
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const sub = await registration.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/notifications/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+      }
+    } catch {
+      // Ignore errors — sign out regardless
+    }
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
@@ -271,6 +288,22 @@ export function MobileHeader({ title, role, userName }: { title: string; role: "
   const router = useRouter();
 
   async function handleSignOut() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const sub = await registration.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/notifications/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+      }
+    } catch {
+      // Ignore errors — sign out regardless
+    }
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
