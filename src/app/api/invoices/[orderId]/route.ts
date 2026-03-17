@@ -316,7 +316,9 @@ function InvoicePDF({
           React.createElement(
             Text,
             { style: styles.partyName },
-            settings.owner_name
+            settings.legal_status
+              ? `${settings.owner_name} – ${settings.legal_status}`
+              : settings.owner_name
           ),
           React.createElement(
             Text,
@@ -370,13 +372,7 @@ function InvoicePDF({
                 `APE : ${settings.ape_code}`
               )
             : null,
-          settings.legal_status
-            ? React.createElement(
-                Text,
-                { style: styles.partyText },
-                settings.legal_status
-              )
-            : null
+          null
         ),
         // Client
         React.createElement(
