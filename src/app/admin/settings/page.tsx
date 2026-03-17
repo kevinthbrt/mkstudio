@@ -71,7 +71,7 @@ export default function SettingsPage() {
     setUploadingStamp(true);
     const supabase = createClient();
     const ext = file.name.split(".").pop();
-    const path = `stamps/stamp-${Date.now()}.${ext}`;
+    const path = `stamp-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("stamps").upload(path, file, { upsert: true });
     if (!error) {
       const { data: { publicUrl } } = supabase.storage.from("stamps").getPublicUrl(path);
