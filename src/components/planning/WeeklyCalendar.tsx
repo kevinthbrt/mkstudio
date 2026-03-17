@@ -38,6 +38,7 @@ export interface ClassSessionWithType {
   session_type: "collective" | "individual" | "duo";
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
+  recurring_rule: string | null;
   class_types: {
     name: string;
     color: string;
