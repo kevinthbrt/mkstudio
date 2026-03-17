@@ -9,6 +9,7 @@ import {
   StyleSheet,
   renderToBuffer,
   Font,
+  Image,
 } from "@react-pdf/renderer";
 
 // Register Helvetica (built-in PDF font)
@@ -320,11 +321,6 @@ function InvoicePDF({
               ? `${settings.owner_name} – ${settings.legal_status}`
               : settings.owner_name
           ),
-          React.createElement(
-            Text,
-            { style: styles.partyText },
-            settings.business_name
-          ),
           settings.address
             ? React.createElement(
                 Text,
@@ -365,13 +361,6 @@ function InvoicePDF({
             { style: { ...styles.partyText, marginTop: 4 } },
             `SIRET : ${settings.siret}`
           ),
-          settings.ape_code
-            ? React.createElement(
-                Text,
-                { style: styles.partyText },
-                `APE : ${settings.ape_code}`
-              )
-            : null,
           null
         ),
         // Client
@@ -526,7 +515,7 @@ function InvoicePDF({
         React.createElement(
           Text,
           { style: styles.tvaMention },
-          `⚡ ${settings.tva_mention}`
+          settings.tva_mention
         ),
 
         settings.bank_details
@@ -544,6 +533,13 @@ function InvoicePDF({
                 settings.bank_details
               )
             )
+          : null,
+
+        settings.stamp_url
+          ? React.createElement(Image, {
+              src: settings.stamp_url,
+              style: { width: 100, height: 100, marginBottom: 8 },
+            })
           : null,
 
         React.createElement(
