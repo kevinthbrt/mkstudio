@@ -51,6 +51,7 @@ export default function AdminPlanningPage() {
     max_participants: "10",
     min_cancel_hours: "3",
     is_hidden: false,
+    apply_to_future: false,
   });
 
   const [typeForm, setTypeForm] = useState({
@@ -117,6 +118,7 @@ export default function AdminPlanningPage() {
       max_participants: String(session.max_participants),
       min_cancel_hours: String(session.min_cancel_hours),
       is_hidden: session.is_hidden,
+      apply_to_future: false,
     });
     setShowEditSession(true);
   }
@@ -362,6 +364,57 @@ export default function AdminPlanningPage() {
             recurring: false,
           }),
         }).catch(() => {});
+      }
+    }
+
+    // Apply changes to all future sessions in the same recurrence series
+    if (editForm.apply_to_future && editingSession.recurring_rule) {
+      const originalDayOfWeek = new Date(editingSession.start_time).getDay();
+      const originalStartHour = new Date(editingSession.start_time).toTimeString().slice(0, 5);
+
+      const { data: futureSessions } = await supabase
+        .from("class_sessions")
+        .select("id, start_time, end_time")
+        .eq("class_type_id", editingSession.class_type_id)
+        .eq("coach_name", editingSession.coach_name)
+        .eq("recurring_rule", editingSession.recurring_rule)
+        .gt("start_time", editingSession.start_time);
+
+      const toUpdate = (futureSessions || []).filter((s) => {
+        const d = new Date(s.start_time);
+        return (
+          d.getDay() === originalDayOfWeek &&
+          d.toTimeString().slice(0, 5) === originalStartHour
+        );
+      });
+
+      if (toUpdate.length > 0) {
+        // Batch update non-time fields
+        await supabase
+          .from("class_sessions")
+          .update({
+            class_type_id: editForm.class_type_id,
+            coach_name: editForm.coach_name,
+            max_participants: isIndividual ? 1 : parseInt(editForm.max_participants),
+            min_cancel_hours: parseInt(editForm.min_cancel_hours),
+          })
+          .in("id", toUpdate.map((s) => s.id));
+
+        // Update time if hours changed
+        const newStartHour = editForm.start_hour;
+        const newEndHour = editForm.end_hour;
+        if (newStartHour !== originalStartHour || newEndHour !== new Date(editingSession.end_time).toTimeString().slice(0, 5)) {
+          for (const session of toUpdate) {
+            const sessionDate = new Date(session.start_time).toISOString().slice(0, 10);
+            await supabase
+              .from("class_sessions")
+              .update({
+                start_time: new Date(`${sessionDate}T${newStartHour}:00`).toISOString(),
+                end_time: new Date(`${sessionDate}T${newEndHour}:00`).toISOString(),
+              })
+              .eq("id", session.id);
+          }
+        }
       }
     }
 
@@ -1113,6 +1166,35 @@ export default function AdminPlanningPage() {
                   {editForm.is_hidden ? "Masqué aux membres" : "Visible aux membres"}
                 </span>
               </label>
+            )}
+
+            {editingSession.recurring_rule && (
+              <div className="border border-[#2a2a2a] rounded-xl p-3 space-y-2.5">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Récurrence</p>
+                <p className="text-sm text-gray-400">
+                  {editingSession.recurring_rule === "weekly:infinite"
+                    ? "Cours récurrent toutes les semaines (infini)"
+                    : `Cours récurrent toutes les semaines (${editingSession.recurring_rule.replace("weekly:", "")} sem.)`}
+                </p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.apply_to_future}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, apply_to_future: e.target.checked })
+                    }
+                    className="w-4 h-4 accent-[#D4AF37]"
+                  />
+                  <span className="text-sm text-gray-300">
+                    Appliquer les modifications aux séances suivantes
+                  </span>
+                </label>
+                {editForm.apply_to_future && (
+                  <p className="text-xs text-amber-500/80">
+                    Les modifications (type, coach, horaires, places, délai d&apos;annulation) seront appliquées à toutes les séances futures de cette série.
+                  </p>
+                )}
+              </div>
             )}
 
             <div className="flex gap-3 pt-2">
