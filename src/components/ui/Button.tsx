@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import React from "react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "gold" | "outline" | "ghost" | "danger";
+  variant?: "gold" | "outline" | "ghost" | "danger" | "orange";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
   children: React.ReactNode;
@@ -30,6 +30,8 @@ export function Button({
       "bg-transparent text-gray-400 hover:text-white hover:bg-white/5 focus:ring-white/10",
     danger:
       "bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-400/50 focus:ring-red-500/30",
+    orange:
+      "bg-orange-500/15 border border-orange-500/30 text-orange-300 hover:bg-orange-500/25 hover:border-orange-400/50 focus:ring-orange-500/30",
   };
 
   const sizes = {

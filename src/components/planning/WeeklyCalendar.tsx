@@ -594,65 +594,98 @@ export function WeeklyCalendar({
         ? localDuoBalance
         : localCollectiveBalance;
 
-      if (balance < totalSpots && !isAdmin) {
-        setBookingError(
-          session.session_type === "individual"
-            ? "Solde individuel insuffisant."
-            : session.session_type === "duo"
-            ? "Solde duo insuffisant."
-            : `Solde collectif insuffisant (${balance} séance(s) disponible(s), ${totalSpots} nécessaire(s)).`
-        );
-        setBooking(false);
-        return;
-      }
-
-      const spotsLeft = session.max_participants - session.current_participants;
-      if (spotsLeft < totalSpots) {
-        setBookingError(`Plus assez de places (${spotsLeft} disponible(s) pour ${totalSpots} personne(s)).`);
-        setBooking(false);
-        return;
-      }
-
       const supabase = createClient();
 
-      const { error } = await supabase.from("class_bookings").upsert(
-        {
-          member_id: memberId,
-          class_session_id: session.id,
-          status: "confirmed",
-          session_debited: true,
-          ...(guests.length > 0 ? { guest_names: guests.join(", ") } : {}),
-          booked_at: new Date().toISOString(),
-          cancelled_at: null,
-        },
-        { onConflict: "member_id,class_session_id" }
-      );
-
-      if (error) {
-        setBookingError("Une erreur est survenue. Réessayez.");
-        setBooking(false);
-        return;
-      }
-
-      if (session.session_type === "individual") {
-        for (let i = 0; i < totalSpots; i++) {
-          await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
+      // Collective sessions: use atomic RPC to prevent overbooking race conditions
+      if (session.session_type === "collective" && !isAdmin) {
+        // Light pre-check for balance (UX only — server validates too)
+        if (balance < totalSpots) {
+          setBookingError(`Solde collectif insuffisant (${balance} séance(s) disponible(s), ${totalSpots} nécessaire(s)).`);
+          setBooking(false);
+          return;
         }
-        setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next, localDuoBalance); return next; });
-      } else if (session.session_type === "duo") {
-        for (let i = 0; i < totalSpots; i++) {
-          await supabase.rpc("decrement_duo_balance", { p_member_id: memberId });
+
+        const { data: result, error: rpcError } = await supabase.rpc("book_collective_session", {
+          p_member_id: memberId,
+          p_session_id: session.id,
+          p_guest_names: guests.length > 0 ? guests.join(", ") : null,
+        });
+
+        if (rpcError || !(result as any)?.success) {
+          const err = (result as any)?.error;
+          if (err === "no_spots") {
+            const left = (result as any)?.spots_left ?? 0;
+            setBookingError(`Ce cours est complet (${left} place(s) disponible(s), ${totalSpots} nécessaire(s)).`);
+          } else if (err === "insufficient_balance") {
+            setBookingError("Solde collectif insuffisant.");
+          } else {
+            setBookingError("Une erreur est survenue. Réessayez.");
+          }
+          setBooking(false);
+          return;
         }
-        setLocalDuoBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, localIndividualBalance, next); return next; });
+
+        const newBalance = (result as any).new_balance ?? (balance - totalSpots);
+        setLocalCollectiveBalance(newBalance);
+        onBalanceChange?.(newBalance, localIndividualBalance, localDuoBalance);
       } else {
-        for (let i = 0; i < totalSpots; i++) {
-          await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
+        // Individual / duo / admin paths — keep existing non-atomic flow
+        if (balance < totalSpots && !isAdmin) {
+          setBookingError(
+            session.session_type === "individual"
+              ? "Solde individuel insuffisant."
+              : "Solde duo insuffisant."
+          );
+          setBooking(false);
+          return;
         }
-        setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance, localDuoBalance); return next; });
-      }
 
-      for (let i = 0; i < totalSpots; i++) {
-        await supabase.rpc("increment_participants", { session_id: session.id });
+        const spotsLeft = session.max_participants - session.current_participants;
+        if (spotsLeft < totalSpots) {
+          setBookingError(`Plus assez de places (${spotsLeft} disponible(s) pour ${totalSpots} personne(s)).`);
+          setBooking(false);
+          return;
+        }
+
+        const { error } = await supabase.from("class_bookings").upsert(
+          {
+            member_id: memberId,
+            class_session_id: session.id,
+            status: "confirmed",
+            session_debited: true,
+            ...(guests.length > 0 ? { guest_names: guests.join(", ") } : {}),
+            booked_at: new Date().toISOString(),
+            cancelled_at: null,
+          },
+          { onConflict: "member_id,class_session_id" }
+        );
+
+        if (error) {
+          setBookingError("Une erreur est survenue. Réessayez.");
+          setBooking(false);
+          return;
+        }
+
+        if (session.session_type === "individual") {
+          for (let i = 0; i < totalSpots; i++) {
+            await supabase.rpc("decrement_individual_balance", { p_member_id: memberId });
+          }
+          setLocalIndividualBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, next, localDuoBalance); return next; });
+        } else if (session.session_type === "duo") {
+          for (let i = 0; i < totalSpots; i++) {
+            await supabase.rpc("decrement_duo_balance", { p_member_id: memberId });
+          }
+          setLocalDuoBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(localCollectiveBalance, localIndividualBalance, next); return next; });
+        } else {
+          for (let i = 0; i < totalSpots; i++) {
+            await supabase.rpc("decrement_collective_balance", { p_member_id: memberId });
+          }
+          setLocalCollectiveBalance((prev) => { const next = prev - totalSpots; onBalanceChange?.(next, localIndividualBalance, localDuoBalance); return next; });
+        }
+
+        for (let i = 0; i < totalSpots; i++) {
+          await supabase.rpc("increment_participants", { session_id: session.id });
+        }
       }
 
       setBookings((b) => ({ ...b, [session.id]: "confirmed" }));
@@ -1208,7 +1241,8 @@ export function WeeklyCalendar({
                       </p>
                     </div>
                     <Button
-                      className="w-full bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30"
+                      variant="orange"
+                      className="w-full"
                       onClick={() => handleJoinWaitlist(selectedSession)}
                       loading={waitlistLoading}
                       disabled={localCollectiveBalance <= 0}

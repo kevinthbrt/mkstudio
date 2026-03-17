@@ -411,6 +411,10 @@ export interface Database {
         Args: { p_session_id: string };
         Returns: number;
       };
+      book_collective_session: {
+        Args: { p_member_id: string; p_session_id: string; p_guest_names?: string | null };
+        Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
+      };
     };
     Enums: {
       [_ in never]?: never;
