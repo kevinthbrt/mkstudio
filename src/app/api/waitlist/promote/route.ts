@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     // Send confirmation email (non-blocking)
     const sessionDate = formatDate(session.start_time);
     const sessionTime = `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`;
-    const sessionName = (session.class_types as { name: string }).name;
+    const sessionName = (session.class_types as unknown as { name: string }).name;
 
     sendWaitlistPromotedEmail({
       to: memberProfile.email,
