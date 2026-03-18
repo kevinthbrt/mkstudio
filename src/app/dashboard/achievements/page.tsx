@@ -99,7 +99,7 @@ async function getLeaderboard(memberId: string) {
   });
 
   const top10 = ranked.slice(0, 10);
-  const myRankEntry = ranked.find((r) => r.is_me) ?? null;
+  const myRankEntry = ranked.find((r: any) => r.is_me) ?? null;
   const showMyRank = myRankEntry && myRankEntry.rank > 10 ? myRankEntry : null;
 
   return { leaderboard: top10, my_rank: myRankEntry, show_my_rank: showMyRank, total_members: ranked.length };
