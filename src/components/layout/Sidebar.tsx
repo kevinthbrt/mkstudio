@@ -162,11 +162,9 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { setAccountOpen(false); }, [pathname]);
 
-    const sideItems = [
-      memberNav[0], // Accueil
-      memberNav[2], // Séances
-      memberNav[3], // Badges
-    ];
+    // 2 left | Réserver (center) | 1 right + Compte
+    const leftItems = [memberNav[0], memberNav[2]]; // Accueil, Séances
+    const rightItems = [memberNav[3]];              // Badges
 
     const isAccountActive =
       pathname.startsWith("/dashboard/purchases") || pathname.startsWith("/dashboard/profile");
@@ -180,8 +178,9 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
             onClick={() => setAccountOpen(false)}
           >
             <div
-              className="absolute bottom-20 right-2 w-48 rounded-2xl overflow-hidden"
+              className="absolute right-2 w-48 rounded-2xl overflow-hidden"
               style={{
+                bottom: "calc(5rem + env(safe-area-inset-bottom))",
                 background: "linear-gradient(180deg, #16152a 0%, #0e0d16 100%)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
@@ -212,8 +211,8 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
         >
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
           <div className="flex items-center px-1">
-            {/* Left 3 items */}
-            {sideItems.map((item) => {
+            {/* Left 2 items: Accueil, Séances */}
+            {leftItems.map((item) => {
               const isActive = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
               return (
                 <Link
@@ -259,6 +258,31 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
                 <span className="text-[10px] font-bold text-[#D4AF37] leading-none mt-0.5">Réserver</span>
               </Link>
             </div>
+
+            {/* Right item: Badges */}
+            {rightItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                    isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                  )}
+                >
+                  <span className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                    isActive
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                      : "text-gray-600"
+                  )}>
+                    {item.icon}
+                  </span>
+                  <span className="leading-none">{item.shortLabel ?? item.label}</span>
+                </Link>
+              );
+            })}
 
             {/* Compte button (Profil + Achats) */}
             <button
