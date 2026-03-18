@@ -180,7 +180,7 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
             <div
               className="absolute right-2 w-48 rounded-2xl overflow-hidden"
               style={{
-                bottom: "calc(5rem + env(safe-area-inset-bottom))",
+                bottom: "calc(5rem + env(safe-area-inset-bottom) + 8px)",
                 background: "linear-gradient(180deg, #16152a 0%, #0e0d16 100%)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
