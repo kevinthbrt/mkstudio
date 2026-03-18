@@ -8,6 +8,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
 
   const { data: profile } = await admin
     .from("profiles")
@@ -18,23 +20,19 @@ export async function GET() {
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   const [xpRes, streakRes, achievementsRes, allAchievementsRes] = await Promise.all([
-    admin.from("user_xp").select("*").eq("member_id", profile.id).maybeSingle(),
-    admin.from("user_streaks").select("*").eq("member_id", profile.id).maybeSingle(),
-    admin
-      .from("user_achievements")
-      .select("achievement_id, earned_at")
-      .eq("member_id", profile.id),
-    admin.from("achievements").select("*").order("sort_order"),
+    db.from("user_xp").select("*").eq("member_id", profile.id).maybeSingle(),
+    db.from("user_streaks").select("*").eq("member_id", profile.id).maybeSingle(),
+    db.from("user_achievements").select("achievement_id, earned_at").eq("member_id", profile.id),
+    db.from("achievements").select("*").order("sort_order"),
   ]);
 
   const xp = xpRes.data ?? { total_xp: 0, level: 1, title: "Novice" };
   const streak = streakRes.data ?? { current_streak_weeks: 0, longest_streak_weeks: 0 };
-  const earnedIds = new Set((achievementsRes.data ?? []).map((a) => a.achievement_id));
+  const earnedIds = new Set((achievementsRes.data ?? []).map((a: any) => a.achievement_id));
   const earnedMap = Object.fromEntries(
-    (achievementsRes.data ?? []).map((a) => [a.achievement_id, a.earned_at])
+    (achievementsRes.data ?? []).map((a: any) => [a.achievement_id, a.earned_at])
   );
 
-  // XP thresholds for level progress bar
   const xpThresholds = [0, 100, 300, 700, 1500, 3000, 6000, 12000, Infinity];
   const currentLevel = xp.level;
   const xpForCurrentLevel = xpThresholds[currentLevel - 1];
@@ -43,7 +41,7 @@ export async function GET() {
     ? 100
     : Math.round(((xp.total_xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100);
 
-  const achievements = (allAchievementsRes.data ?? []).map((a) => ({
+  const achievements = (allAchievementsRes.data ?? []).map((a: any) => ({
     ...a,
     earned: earnedIds.has(a.id),
     earned_at: earnedMap[a.id] ?? null,

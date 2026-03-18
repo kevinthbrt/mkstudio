@@ -27,9 +27,11 @@ export default async function MemberDashboard() {
   if (!profile) redirect("/login");
 
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
   const [xpRes, streakRes] = await Promise.all([
-    admin.from("user_xp").select("total_xp, level, title").eq("member_id", profile.id).maybeSingle(),
-    admin.from("user_streaks").select("current_streak_weeks, longest_streak_weeks").eq("member_id", profile.id).maybeSingle(),
+    db.from("user_xp").select("total_xp, level, title").eq("member_id", profile.id).maybeSingle(),
+    db.from("user_streaks").select("current_streak_weeks, longest_streak_weeks").eq("member_id", profile.id).maybeSingle(),
   ]);
 
   const xpData = xpRes.data ?? { total_xp: 0, level: 1, title: "Novice" };

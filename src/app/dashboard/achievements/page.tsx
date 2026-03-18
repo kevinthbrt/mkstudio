@@ -8,19 +8,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 async function getGamificationData(memberId: string) {
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
 
   const [xpRes, streakRes, achievementsRes, allAchievementsRes] = await Promise.all([
-    admin.from("user_xp").select("*").eq("member_id", memberId).maybeSingle(),
-    admin.from("user_streaks").select("*").eq("member_id", memberId).maybeSingle(),
-    admin.from("user_achievements").select("achievement_id, earned_at").eq("member_id", memberId),
-    admin.from("achievements").select("*").order("sort_order"),
+    db.from("user_xp").select("*").eq("member_id", memberId).maybeSingle(),
+    db.from("user_streaks").select("*").eq("member_id", memberId).maybeSingle(),
+    db.from("user_achievements").select("achievement_id, earned_at").eq("member_id", memberId),
+    db.from("achievements").select("*").order("sort_order"),
   ]);
 
   const xp = xpRes.data ?? { total_xp: 0, level: 1, title: "Novice" };
   const streak = streakRes.data ?? { current_streak_weeks: 0, longest_streak_weeks: 0 };
-  const earnedIds = new Set((achievementsRes.data ?? []).map((a) => a.achievement_id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const earnedIds = new Set((achievementsRes.data ?? []).map((a: any) => a.achievement_id));
   const earnedMap = Object.fromEntries(
-    (achievementsRes.data ?? []).map((a) => [a.achievement_id, a.earned_at])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (achievementsRes.data ?? []).map((a: any) => [a.achievement_id, a.earned_at])
   );
 
   const xpThresholds = [0, 100, 300, 700, 1500, 3000, 6000, 12000, Infinity];
@@ -34,7 +38,8 @@ async function getGamificationData(memberId: string) {
           ((xp.total_xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100
         );
 
-  const achievements = (allAchievementsRes.data ?? []).map((a) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const achievements = (allAchievementsRes.data ?? []).map((a: any) => ({
     ...a,
     earned: earnedIds.has(a.id),
     earned_at: earnedMap[a.id] ?? null,
@@ -59,8 +64,10 @@ async function getGamificationData(memberId: string) {
 
 async function getLeaderboard(memberId: string) {
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
 
-  const { data: allXp } = await admin
+  const { data: allXp } = await db
     .from("user_xp")
     .select("member_id, level, title, total_xp")
     .order("total_xp", { ascending: false });
@@ -69,7 +76,8 @@ async function getLeaderboard(memberId: string) {
     return { leaderboard: [], my_rank: null, show_my_rank: null, total_members: 0 };
   }
 
-  const memberIds = allXp.map((x) => x.member_id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const memberIds = allXp.map((x: any) => x.member_id);
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, first_name, last_name")
@@ -77,8 +85,9 @@ async function getLeaderboard(memberId: string) {
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
 
-  const ranked = allXp.map((x, index) => {
-    const p = profileMap[x.member_id as string];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ranked = allXp.map((x: any, index: number) => {
+    const p = profileMap[x.member_id] as any;
     return {
       rank: index + 1,
       member_id: x.member_id as string,
