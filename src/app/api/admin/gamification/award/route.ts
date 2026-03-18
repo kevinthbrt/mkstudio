@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -23,7 +24,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "member_id and achievement_code are required" }, { status: 400 });
   }
 
-  const { data, error } = await supabase.rpc("award_manual_achievement", {
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any).rpc("award_manual_achievement", {
     p_member_id: member_id,
     p_achievement_code: achievement_code,
   });
