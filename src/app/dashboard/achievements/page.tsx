@@ -123,7 +123,7 @@ export default async function AchievementsPage() {
     getLeaderboard(profile.id),
   ]);
 
-  const earnedCount = gamification.achievements.filter((a) => a.earned).length;
+  const earnedCount = gamification.achievements.filter((a: any) => a.earned).length;
   const totalCount = gamification.achievements.length;
 
   return (
