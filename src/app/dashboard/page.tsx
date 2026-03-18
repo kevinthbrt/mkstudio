@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui/Card";
-import { Zap, Calendar, Users, TrendingUp, ArrowRight, UserPlus } from "lucide-react";
+import { Zap, Calendar, Users, ArrowRight, UserPlus, Trophy } from "lucide-react";
 import Link from "next/link";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { NotificationBanner } from "@/components/NotificationBanner";
+import { XPBar } from "@/components/gamification/XPBar";
+import { StreakDisplay } from "@/components/gamification/StreakDisplay";
 
 export default async function MemberDashboard() {
   const supabase = await createClient();
@@ -22,6 +25,26 @@ export default async function MemberDashboard() {
     .single();
 
   if (!profile) redirect("/login");
+
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
+  const [xpRes, streakRes] = await Promise.all([
+    db.from("user_xp").select("total_xp, level, title").eq("member_id", profile.id).maybeSingle(),
+    db.from("user_streaks").select("current_streak_weeks, longest_streak_weeks").eq("member_id", profile.id).maybeSingle(),
+  ]);
+
+  const xpData = xpRes.data ?? { total_xp: 0, level: 1, title: "Novice" };
+  const streakData = streakRes.data ?? { current_streak_weeks: 0, longest_streak_weeks: 0 };
+
+  const xpThresholds = [0, 100, 300, 700, 1500, 3000, 6000, 12000, Infinity];
+  const currentLevel = xpData.level as number;
+  const xpForCurrentLevel = xpThresholds[currentLevel - 1];
+  const xpForNextLevel = xpThresholds[currentLevel];
+  const progressPercent =
+    xpForNextLevel === Infinity
+      ? 100
+      : Math.round(((xpData.total_xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100);
 
   const { data: upcomingBookings } = await supabase
     .from("class_bookings")
@@ -65,6 +88,41 @@ export default async function MemberDashboard() {
       </div>
 
       <NotificationBanner />
+
+      {/* Gamification widget */}
+      <Link href="/dashboard/achievements" className="block">
+        <div
+          className="rounded-2xl p-4 space-y-4 transition-all hover:border-[#D4AF37]/25 cursor-pointer"
+          style={{
+            background: "linear-gradient(135deg, rgba(30,28,45,0.8) 0%, rgba(22,21,38,0.9) 100%)",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Trophy size={14} className="text-[#D4AF37]" />
+              <span className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Ma progression</span>
+            </div>
+            <ArrowRight size={12} className="text-gray-600" />
+          </div>
+          <XPBar
+            level={currentLevel}
+            title={xpData.title as string}
+            totalXp={xpData.total_xp as number}
+            xpForCurrentLevel={xpForCurrentLevel}
+            xpForNextLevel={xpForNextLevel === Infinity ? null : xpForNextLevel}
+            progressPercent={progressPercent}
+            compact
+          />
+          {streakData.current_streak_weeks > 0 && (
+            <StreakDisplay
+              current={streakData.current_streak_weeks as number}
+              longest={streakData.longest_streak_weeks as number}
+              compact
+            />
+          )}
+        </div>
+      </Link>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">

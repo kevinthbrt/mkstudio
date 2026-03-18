@@ -9,9 +9,11 @@ import {
   LogOut,
   Package,
   Settings,
+  Trophy,
   User,
   Users,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 // Package and CreditCard kept for admin nav
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,6 +30,7 @@ const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Accueil", icon: <Home size={18} /> },
   { href: "/dashboard/planning", label: "Planning", icon: <Calendar size={18} /> },
   { href: "/dashboard/sessions", label: "Mes séances", shortLabel: "Séances", icon: <BarChart3 size={18} /> },
+  { href: "/dashboard/achievements", label: "Badges & Niveau", shortLabel: "Badges", icon: <Trophy size={18} /> },
   { href: "/dashboard/purchases", label: "Achats & Factures", shortLabel: "Achats", icon: <CreditCard size={18} /> },
   { href: "/dashboard/profile", label: "Mon profil", shortLabel: "Profil", icon: <User size={18} /> },
 ];
@@ -152,94 +155,156 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
   const pathname = usePathname();
 
   if (role === "member") {
-    // Member nav: 4 items + central Réserver button
-    const sideItems = [
-      memberNav[0], // Accueil
-      memberNav[2], // Séances
-      memberNav[3], // Achats
-      memberNav[4], // Profil
-    ];
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [accountOpen, setAccountOpen] = useState(false);
+
+    // Close on route change
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => { setAccountOpen(false); }, [pathname]);
+
+    // 2 left | Réserver (center) | 1 right + Compte
+    const leftItems = [memberNav[0], memberNav[2]]; // Accueil, Séances
+    const rightItems = [memberNav[3]];              // Badges
+
+    const isAccountActive =
+      pathname.startsWith("/dashboard/purchases") || pathname.startsWith("/dashboard/profile");
 
     return (
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 safe-bottom"
-        style={{ background: "linear-gradient(0deg, #0b0a12 0%, rgba(11,10,18,0.98) 100%)" }}
-      >
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
-        <div className="flex items-center px-1">
-          {/* First 2 items */}
-          {sideItems.slice(0, 2).map((item) => {
-            const isActive = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
-            return (
+      <>
+        {/* Account popup menu */}
+        {accountOpen && (
+          <div
+            className="lg:hidden fixed inset-0 z-40"
+            onClick={() => setAccountOpen(false)}
+          >
+            <div
+              className="absolute right-2 w-48 rounded-2xl overflow-hidden"
+              style={{
+                bottom: "calc(5rem + env(safe-area-inset-bottom))",
+                background: "linear-gradient(180deg, #16152a 0%, #0e0d16 100%)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Link
-                key={item.href}
-                href={item.href}
+                href="/dashboard/profile"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <User size={16} className="text-gray-500" />
+                Mon profil
+              </Link>
+              <div className="h-px bg-white/5" />
+              <Link
+                href="/dashboard/purchases"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <CreditCard size={16} className="text-gray-500" />
+                Achats & Factures
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+          style={{ background: "linear-gradient(0deg, #0b0a12 0%, rgba(11,10,18,0.98) 100%)" }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
+          <div className="flex items-center px-1">
+            {/* Left 2 items: Accueil, Séances */}
+            {leftItems.map((item) => {
+              const isActive = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                    isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                  )}
+                >
+                  <span className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                    isActive
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                      : "text-gray-600"
+                  )}>
+                    {item.icon}
+                  </span>
+                  <span className="leading-none">{item.shortLabel ?? item.label}</span>
+                </Link>
+              );
+            })}
+
+            {/* Central Réserver button */}
+            <div className="flex-1 flex flex-col items-center justify-center py-1">
+              <Link
+                href="/dashboard/planning"
                 className={cn(
-                  "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
-                  isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                  "flex flex-col items-center gap-1 transition-all duration-150",
+                  pathname.startsWith("/dashboard/planning") ? "opacity-100" : "opacity-90 hover:opacity-100"
                 )}
               >
-                <span className={cn(
-                  "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
-                  isActive
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
-                    : "text-gray-600"
-                )}>
-                  {item.icon}
+                <span
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(212,175,55,0.45)] -mt-4"
+                  style={{
+                    background: pathname.startsWith("/dashboard/planning")
+                      ? "linear-gradient(135deg, #E8C84A 0%, #B8941E 100%)"
+                      : "linear-gradient(135deg, #D4AF37 0%, #A8861A 100%)",
+                  }}
+                >
+                  <Calendar size={22} className="text-black" />
                 </span>
-                <span className="leading-none">{item.shortLabel ?? item.label}</span>
+                <span className="text-[10px] font-bold text-[#D4AF37] leading-none mt-0.5">Réserver</span>
               </Link>
-            );
-          })}
+            </div>
 
-          {/* Central Réserver button */}
-          <div className="flex-1 flex flex-col items-center justify-center py-1">
-            <Link
-              href="/dashboard/planning"
+            {/* Right item: Badges */}
+            {rightItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                    isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
+                  )}
+                >
+                  <span className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                    isActive
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                      : "text-gray-600"
+                  )}>
+                    {item.icon}
+                  </span>
+                  <span className="leading-none">{item.shortLabel ?? item.label}</span>
+                </Link>
+              );
+            })}
+
+            {/* Compte button (Profil + Achats) */}
+            <button
+              onClick={() => setAccountOpen((v) => !v)}
               className={cn(
-                "flex flex-col items-center gap-1 transition-all duration-150",
-                pathname.startsWith("/dashboard/planning") ? "opacity-100" : "opacity-90 hover:opacity-100"
+                "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
+                isAccountActive || accountOpen ? "text-[#D4AF37]" : "text-gray-700"
               )}
             >
-              <span
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(212,175,55,0.45)] -mt-4"
-                style={{
-                  background: pathname.startsWith("/dashboard/planning")
-                    ? "linear-gradient(135deg, #E8C84A 0%, #B8941E 100%)"
-                    : "linear-gradient(135deg, #D4AF37 0%, #A8861A 100%)",
-                }}
-              >
-                <Calendar size={22} className="text-black" />
+              <span className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                isAccountActive || accountOpen
+                  ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                  : "text-gray-600"
+              )}>
+                <User size={18} />
               </span>
-              <span className="text-[10px] font-bold text-[#D4AF37] leading-none mt-0.5">Réserver</span>
-            </Link>
+              <span className="leading-none">Compte</span>
+            </button>
           </div>
-
-          {/* Last 2 items */}
-          {sideItems.slice(2).map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex-1 flex flex-col items-center gap-1 py-3 px-1 text-[10px] font-semibold transition-all duration-150 rounded-xl my-1",
-                  isActive ? "text-[#D4AF37]" : "text-gray-700 hover:text-gray-400"
-                )}
-              >
-                <span className={cn(
-                  "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
-                  isActive
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37] shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
-                    : "text-gray-600"
-                )}>
-                  {item.icon}
-                </span>
-                <span className="leading-none">{item.shortLabel ?? item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+        </nav>
+      </>
     );
   }
 
