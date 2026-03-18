@@ -90,7 +90,7 @@ export default async function MemberDashboard() {
       <NotificationBanner />
 
       {/* Gamification widget */}
-      <Link href="/dashboard/achievements">
+      <Link href="/dashboard/achievements" className="block">
         <div
           className="rounded-2xl p-4 space-y-4 transition-all hover:border-[#D4AF37]/25 cursor-pointer"
           style={{
