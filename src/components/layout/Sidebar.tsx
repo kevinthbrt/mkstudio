@@ -9,6 +9,7 @@ import {
   LogOut,
   Package,
   Settings,
+  Trophy,
   User,
   Users,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const memberNav: NavItem[] = [
   { href: "/dashboard", label: "Accueil", icon: <Home size={18} /> },
   { href: "/dashboard/planning", label: "Planning", icon: <Calendar size={18} /> },
   { href: "/dashboard/sessions", label: "Mes séances", shortLabel: "Séances", icon: <BarChart3 size={18} /> },
+  { href: "/dashboard/achievements", label: "Badges & Niveau", shortLabel: "Badges", icon: <Trophy size={18} /> },
   { href: "/dashboard/purchases", label: "Achats & Factures", shortLabel: "Achats", icon: <CreditCard size={18} /> },
   { href: "/dashboard/profile", label: "Mon profil", shortLabel: "Profil", icon: <User size={18} /> },
 ];
@@ -156,8 +158,8 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
     const sideItems = [
       memberNav[0], // Accueil
       memberNav[2], // Séances
-      memberNav[3], // Achats
-      memberNav[4], // Profil
+      memberNav[3], // Badges
+      memberNav[5], // Profil
     ];
 
     return (
