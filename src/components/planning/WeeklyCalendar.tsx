@@ -197,10 +197,11 @@ export function WeeklyCalendar({
         setWaitlists(waitlistMap);
 
         // Members only see individual/duo sessions they are enrolled in
+        // Hidden sessions are never shown to members (unless already booked)
         setSessions(
           rawSessions.filter(
             (s) =>
-              s.session_type === "collective" ||
+              (s.session_type === "collective" && !s.is_hidden) ||
               bookingMap[s.id] === "confirmed"
           )
         );
