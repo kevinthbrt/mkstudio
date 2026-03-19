@@ -18,7 +18,7 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
     if (open) {
       const scrollY = window.scrollY;
       document.body.dataset.scrollY = String(scrollY);
-      document.body.style.cssText = `overflow: hidden; position: fixed; top: -${scrollY}px; left: 0; right: 0;`;
+      document.body.style.cssText = `overflow: hidden; position: fixed; top: -${scrollY}px; left: 0; right: 0; bottom: 0;`;
     } else {
       const scrollY = parseInt(document.body.dataset.scrollY || "0");
       document.body.style.cssText = "";
@@ -59,18 +59,18 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
           "relative w-full rounded-t-3xl sm:rounded-2xl shadow-2xl",
           "bg-gradient-to-br from-[#1e1c2d] to-[#191828]",
           "border border-[#2d2b40] border-b-0 sm:border-b",
-          "max-h-[92dvh] overflow-y-auto overscroll-contain",
+          "max-h-[92vh] max-h-[92dvh] flex flex-col",
           sizes[size],
           className
         )}
       >
         {/* Pull indicator on mobile */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1">
+        <div className="sm:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-[#3d3a58]" />
         </div>
 
         {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2d2b40] sticky top-0 bg-[#1e1c2d] z-10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2d2b40] bg-[#1e1c2d] flex-shrink-0 rounded-t-3xl sm:rounded-t-2xl">
             <h2 className="text-base font-bold text-white">{title}</h2>
             <button
               onClick={onClose}
@@ -80,7 +80,9 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
             </button>
           </div>
         )}
-        <div className="p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="p-5">{children}</div>
+        </div>
       </div>
     </div>
   );
