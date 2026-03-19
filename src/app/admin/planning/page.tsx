@@ -592,6 +592,7 @@ export default function AdminPlanningPage() {
           first_name: m.first_name,
           last_name: m.last_name,
           collective_balance: m.collective_balance,
+          individual_balance: m.individual_balance ?? 0,
           duo_balance: m.duo_balance ?? 0,
         }))}
         onRequestEdit={openEditModal}
