@@ -51,6 +51,7 @@ interface AdminMember {
   first_name: string;
   last_name: string;
   collective_balance: number;
+  individual_balance: number;
   duo_balance: number;
 }
 
@@ -196,10 +197,11 @@ export function WeeklyCalendar({
         setWaitlists(waitlistMap);
 
         // Members only see individual/duo sessions they are enrolled in
+        // Hidden sessions are never shown to members (unless already booked)
         setSessions(
           rawSessions.filter(
             (s) =>
-              s.session_type === "collective" ||
+              (s.session_type === "collective" && !s.is_hidden) ||
               bookingMap[s.id] === "confirmed"
           )
         );
@@ -276,9 +278,16 @@ export function WeeklyCalendar({
     if (!member) { setAdminBooking(false); return; }
 
     const isDuo = session.session_type === "duo";
+    const isIndividualAdmin = session.session_type === "individual";
     if (isDuo) {
       if (member.duo_balance < 1) {
         setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances duo.`);
+        setAdminBooking(false);
+        return;
+      }
+    } else if (isIndividualAdmin) {
+      if (member.individual_balance < 1) {
+        setAdminBookingError(`${member.first_name} ${member.last_name} n'a plus de séances individuelles.`);
         setAdminBooking(false);
         return;
       }
@@ -326,6 +335,8 @@ export function WeeklyCalendar({
 
     if (isDuo) {
       await supabase.rpc("decrement_duo_balance", { p_member_id: adminBookingMemberId });
+    } else if (isIndividualAdmin) {
+      await supabase.rpc("decrement_individual_balance", { p_member_id: adminBookingMemberId });
     } else {
       await supabase.rpc("decrement_collective_balance", { p_member_id: adminBookingMemberId });
     }
@@ -1470,6 +1481,8 @@ export function WeeklyCalendar({
                               <option key={m.id} value={m.id}>
                                 {selectedSession.session_type === "duo"
                                   ? `${m.first_name} ${m.last_name} (${m.duo_balance} séance${m.duo_balance !== 1 ? "s" : ""} duo)`
+                                  : selectedSession.session_type === "individual"
+                                  ? `${m.first_name} ${m.last_name} (${m.individual_balance} séance${m.individual_balance !== 1 ? "s" : ""} indiv)`
                                   : `${m.first_name} ${m.last_name} (${m.collective_balance} séance${m.collective_balance !== 1 ? "s" : ""})`}
                               </option>
                             ))}

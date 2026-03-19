@@ -16,12 +16,18 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, className, size = "md" }: ModalProps) {
   useEffect(() => {
     if (open) {
-      document.body.style.overflow = "hidden";
+      const scrollY = window.scrollY;
+      document.body.dataset.scrollY = String(scrollY);
+      document.body.style.cssText = `overflow: hidden; position: fixed; top: -${scrollY}px; left: 0; right: 0;`;
     } else {
-      document.body.style.overflow = "";
+      const scrollY = parseInt(document.body.dataset.scrollY || "0");
+      document.body.style.cssText = "";
+      window.scrollTo(0, scrollY);
     }
     return () => {
-      document.body.style.overflow = "";
+      const scrollY = parseInt(document.body.dataset.scrollY || "0");
+      document.body.style.cssText = "";
+      window.scrollTo(0, scrollY);
     };
   }, [open]);
 
@@ -53,7 +59,7 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
           "relative w-full rounded-t-3xl sm:rounded-2xl shadow-2xl",
           "bg-gradient-to-br from-[#1e1c2d] to-[#191828]",
           "border border-[#2d2b40] border-b-0 sm:border-b",
-          "max-h-[92vh] overflow-y-auto",
+          "max-h-[92dvh] overflow-y-auto overscroll-contain",
           sizes[size],
           className
         )}
