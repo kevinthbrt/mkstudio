@@ -74,6 +74,7 @@ export default function AdminPlanningPage() {
   const [soloMemberSearch, setSoloMemberSearch] = useState("");
   const [editSoloMemberSearch, setEditSoloMemberSearch] = useState("");
   const [savingSession, setSavingSession] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [cancellingSession, setCancellingSession] = useState(false);
   const [savingType, setSavingType] = useState(false);
@@ -125,6 +126,7 @@ export default function AdminPlanningPage() {
 
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault();
+    setCreateError("");
     setSavingSession(true);
 
     const supabase = createClient();
@@ -173,6 +175,30 @@ export default function AdminPlanningPage() {
         recurring_rule: null,
         is_hidden: false,
       });
+    }
+
+    // Balance check before inserting sessions
+    if (isIndividual && sessionForm.assigned_member_id) {
+      const member = members.find((m) => m.id === sessionForm.assigned_member_id);
+      if (member && (member.individual_balance ?? 0) < sessions.length) {
+        setCreateError(
+          `${member.first_name} ${member.last_name} n'a que ${member.individual_balance ?? 0} séance(s) individuelle(s) disponible(s) — ${sessions.length} nécessaire(s).`
+        );
+        setSavingSession(false);
+        return;
+      }
+    }
+    if (isDuo && sessionForm.assigned_member_ids.length > 0) {
+      for (const memberId of sessionForm.assigned_member_ids) {
+        const member = members.find((m) => m.id === memberId);
+        if (member && (member.duo_balance ?? 0) < sessions.length) {
+          setCreateError(
+            `${member.first_name} ${member.last_name} n'a que ${member.duo_balance ?? 0} séance(s) duo disponible(s) — ${sessions.length} nécessaire(s).`
+          );
+          setSavingSession(false);
+          return;
+        }
+      }
     }
 
     const { data: createdSessions } = await supabase
@@ -603,7 +629,7 @@ export default function AdminPlanningPage() {
       {/* Create session modal */}
       <Modal
         open={showCreateSession}
-        onClose={() => setShowCreateSession(false)}
+        onClose={() => { setShowCreateSession(false); setCreateError(""); }}
         title="Créer un cours"
         size="lg"
       >
@@ -958,6 +984,10 @@ export default function AdminPlanningPage() {
                   : ""}.
               </p>
             </div>
+          )}
+
+          {createError && (
+            <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">{createError}</p>
           )}
 
           <div className="flex gap-3 pt-2">

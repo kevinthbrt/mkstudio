@@ -80,7 +80,7 @@ export function Modal({ open, onClose, title, children, className, size = "md" }
             </button>
           </div>
         )}
-        <div className="p-5">{children}</div>
+        <div className="p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5">{children}</div>
       </div>
     </div>
   );
