@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendWelcomeEmail } from "@/lib/email";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(_request: NextRequest) {
@@ -17,6 +18,11 @@ export async function POST(_request: NextRequest) {
 
   try {
     await sendWelcomeEmail(profile.email, profile.first_name);
+    notifyAdmin(
+      "Nouvel adhérent inscrit",
+      `${profile.first_name} (${profile.email}) vient de créer un compte.`,
+      "/admin/members"
+    );
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[email/welcome]", err);
