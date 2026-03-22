@@ -27,6 +27,7 @@ import {
   Lock,
   User,
 } from "lucide-react";
+import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { formatDate } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 
@@ -454,11 +455,10 @@ export default function MembersPage() {
             onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
             icon={<Phone size={14} />}
           />
-          <Input
+          <DateOfBirthPicker
             label="Date de naissance (optionnel)"
-            type="date"
             value={newMember.date_of_birth}
-            onChange={(e) => setNewMember({ ...newMember, date_of_birth: e.target.value })}
+            onChange={(v) => setNewMember({ ...newMember, date_of_birth: v })}
           />
           <Input
             label="Mot de passe temporaire"
@@ -806,11 +806,10 @@ export default function MembersPage() {
                   icon={<Phone size={14} />}
                   placeholder="+33 6 00 00 00 00"
                 />
-                <Input
+                <DateOfBirthPicker
                   label="Date de naissance"
-                  type="date"
                   value={editForm.date_of_birth}
-                  onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                  onChange={(v) => setEditForm({ ...editForm, date_of_birth: v })}
                 />
                 {editSuccess && (
                   <div className="flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-2.5">

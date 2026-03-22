@@ -7,7 +7,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { CharterModal } from "@/components/CharterModal";
-import { Lock, Mail, User, CheckCircle, Cake } from "lucide-react";
+import { Lock, Mail, User, CheckCircle } from "lucide-react";
+import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
@@ -189,14 +190,11 @@ export default function RegisterPage() {
               required
               autoComplete="email"
             />
-            <Input
+            <DateOfBirthPicker
               label="Date de naissance"
-              type="date"
               value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              icon={<Cake size={16} />}
+              onChange={setDateOfBirth}
               required
-              autoComplete="bday"
             />
             <Input
               label="Mot de passe"
