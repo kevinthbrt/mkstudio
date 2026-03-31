@@ -81,22 +81,26 @@ async function getLeaderboard(memberId: string) {
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, first_name, last_name")
-    .in("id", memberIds);
+    .in("id", memberIds)
+    .eq("is_test_account", false);
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ranked = allXp.map((x: any, index: number) => {
-    const p = profileMap[x.member_id] as any;
-    return {
-      rank: index + 1,
-      member_id: x.member_id as string,
-      display_name: p ? `${p.first_name} ${p.last_name?.charAt(0) ?? ""}.` : "Membre",
-      level: x.level as number,
-      title: x.title as string,
-      is_me: x.member_id === memberId,
-    };
-  });
+  const ranked = allXp
+    .filter((x: any) => profileMap[x.member_id])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((x: any, index: number) => {
+      const p = profileMap[x.member_id] as any;
+      return {
+        rank: index + 1,
+        member_id: x.member_id as string,
+        display_name: `${p.first_name} ${p.last_name?.charAt(0) ?? ""}.`,
+        level: x.level as number,
+        title: x.title as string,
+        is_me: x.member_id === memberId,
+      };
+    });
 
   const top10 = ranked.slice(0, 10);
   const myRankEntry = ranked.find((r: any) => r.is_me) ?? null;
