@@ -18,7 +18,7 @@ export async function POST(_request: NextRequest) {
 
   try {
     await sendWelcomeEmail(profile.email, profile.first_name);
-    notifyAdmin(
+    await notifyAdmin(
       "Nouvel adhérent inscrit",
       `${profile.first_name} (${profile.email}) vient de créer un compte.`,
       "/admin/members"
