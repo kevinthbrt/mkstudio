@@ -24,6 +24,7 @@ export interface Database {
           legal_status: string | null;
           charter_accepted_at: string | null;
           date_of_birth: string | null;
+          is_test_account: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -41,6 +42,7 @@ export interface Database {
           legal_status?: string | null;
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
+          is_test_account?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -58,6 +60,7 @@ export interface Database {
           legal_status?: string | null;
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
+          is_test_account?: boolean;
           updated_at?: string;
         };
         Relationships: [];
