@@ -32,24 +32,27 @@ export async function GET() {
 
   const { data: profiles } = await admin
     .from("profiles")
-    .select("id, first_name, last_name")
-    .in("id", memberIds);
+    .select("id, first_name, last_name, is_test_account")
+    .in("id", memberIds)
+    .eq("is_test_account", false);
 
   const profileMap = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, p])
   );
 
-  const ranked = allXp.map((x: any, index: number) => {
-    const p = profileMap[x.member_id] as any;
-    return {
-      rank: index + 1,
-      member_id: x.member_id,
-      display_name: p ? `${p.first_name} ${p.last_name?.charAt(0) ?? ""}.` : "Membre",
-      level: x.level,
-      title: x.title,
-      is_me: x.member_id === profile.id,
-    };
-  });
+  const ranked = allXp
+    .filter((x: any) => profileMap[x.member_id])
+    .map((x: any, index: number) => {
+      const p = profileMap[x.member_id] as any;
+      return {
+        rank: index + 1,
+        member_id: x.member_id,
+        display_name: `${p.first_name} ${p.last_name?.charAt(0) ?? ""}.`,
+        level: x.level,
+        title: x.title,
+        is_me: x.member_id === profile.id,
+      };
+    });
 
   const myRankEntry = ranked.find((r: any) => r.is_me);
   const top10 = ranked.slice(0, 10);
