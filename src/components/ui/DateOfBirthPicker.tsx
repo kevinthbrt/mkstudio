@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 interface DateOfBirthPickerProps {
   label?: string;
@@ -22,9 +23,18 @@ const selectClass = cn(
 
 export function DateOfBirthPicker({ label, value, onChange, required, error, className }: DateOfBirthPickerProps) {
   const parts = value ? value.split("-") : ["", "", ""];
-  const year = parts[0] || "";
-  const month = parts[1] || "";
-  const day = parts[2] || "";
+
+  const [year, setYear] = useState(parts[0] || "");
+  const [month, setMonth] = useState(parts[1] || "");
+  const [day, setDay] = useState(parts[2] || "");
+
+  // Sync internal state when external value changes (e.g. form reset)
+  useEffect(() => {
+    const p = value ? value.split("-") : ["", "", ""];
+    setYear(p[0] || "");
+    setMonth(p[1] || "");
+    setDay(p[2] || "");
+  }, [value]);
 
   function update(y: string, m: string, d: string) {
     if (y && m && d) {
@@ -53,7 +63,11 @@ export function DateOfBirthPicker({ label, value, onChange, required, error, cla
         <div className="relative">
           <select
             value={day}
-            onChange={(e) => update(year, month, e.target.value)}
+            onChange={(e) => {
+              const d = e.target.value;
+              setDay(d);
+              update(year, month, d);
+            }}
             className={cn(selectClass, "w-full", error && "border-red-500/50")}
             required={required}
           >
@@ -73,7 +87,15 @@ export function DateOfBirthPicker({ label, value, onChange, required, error, cla
         <div className="relative">
           <select
             value={month}
-            onChange={(e) => update(year, e.target.value, day)}
+            onChange={(e) => {
+              const m = e.target.value;
+              setMonth(m);
+              // Reset day if it exceeds the days in the new month
+              const maxDays = year && m ? new Date(Number(year), Number(m), 0).getDate() : 31;
+              const adjustedDay = day && Number(day) > maxDays ? "" : day;
+              if (adjustedDay !== day) setDay(adjustedDay);
+              update(year, m, adjustedDay);
+            }}
             className={cn(selectClass, "w-full", error && "border-red-500/50")}
             required={required}
           >
@@ -93,7 +115,11 @@ export function DateOfBirthPicker({ label, value, onChange, required, error, cla
         <div className="relative">
           <select
             value={year}
-            onChange={(e) => update(e.target.value, month, day)}
+            onChange={(e) => {
+              const y = e.target.value;
+              setYear(y);
+              update(y, month, day);
+            }}
             className={cn(selectClass, "w-full", error && "border-red-500/50")}
             required={required}
           >
