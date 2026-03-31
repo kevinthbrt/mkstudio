@@ -30,7 +30,6 @@ const CHARTER_SECTIONS = [
     title: "3. Ponctualité",
     items: [
       "Merci d'arriver au moins 5 minutes avant le début de votre cours.",
-      "Par respect pour le coach et les autres participants, tout retard de plus de 10 minutes pourra entraîner un refus d'accès au cours. La séance sera alors considérée comme consommée.",
     ],
   },
   {
@@ -46,7 +45,6 @@ const CHARTER_SECTIONS = [
     items: [
       "L'accès à l'espace sportif et aux machines se fait uniquement en présence du coach. Il est strictement interdit d'utiliser une machine sans la présence ou l'accord préalable du coach.",
       "Le matériel mis à disposition doit être utilisé correctement et rangé après chaque utilisation.",
-      "Merci de nettoyer le matériel après usage (tapis, machines, accessoires).",
       "Toute dégradation volontaire du matériel ou des locaux pourra entraîner des frais de réparation à la charge de l'adhérent.",
     ],
   },
