@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { sendWelcomeEmail } from "@/lib/email";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -42,6 +44,28 @@ export async function GET(request: NextRequest) {
       if (type === "recovery") {
         return NextResponse.redirect(`${origin}/reset-password`);
       }
+
+      // Send welcome email and admin notification on signup confirmation
+      if (type === "signup") {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("first_name, email")
+            .eq("user_id", user.id)
+            .single();
+
+          if (profile) {
+            sendWelcomeEmail(profile.email, profile.first_name).catch(() => {});
+            notifyAdmin(
+              "Nouvel adhérent inscrit",
+              `${profile.first_name} (${profile.email}) vient de créer un compte.`,
+              "/admin/members"
+            );
+          }
+        }
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
