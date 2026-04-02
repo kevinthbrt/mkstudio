@@ -241,16 +241,21 @@ export default function SessionsPage() {
                         </div>
                       )}
 
-                      {!cancellable && hoursLeft > 0 && (
+                      {!cancellable && hoursLeft > 0 && !isIndividual && !isDuo && (
                         <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-400">
                           <AlertTriangle size={12} />
                           Annulation impossible (moins de {booking.class_sessions.min_cancel_hours}h avant le cours)
                         </div>
                       )}
+                      {(isIndividual || isDuo) && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Pour vous désinscrire, veuillez contacter votre coach directement.
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {cancellable && (
+                  {cancellable && !isIndividual && !isDuo && (
                     <div className="mt-3 pt-3 border-t border-[#1f1f1f]">
                       <Button
                         variant="outline"

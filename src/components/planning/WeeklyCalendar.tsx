@@ -1357,14 +1357,9 @@ export function WeeklyCalendar({
                   Ce cours individuel a été planifié par votre coach.
                 </p>
                 {bookings[selectedSession.id] === "confirmed" && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-3 text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    onClick={() => handleBook(selectedSession)}
-                    loading={booking}
-                  >
-                    Annuler ma participation
-                  </Button>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Pour vous désinscrire de ce cours, veuillez contacter votre coach directement.
+                  </p>
                 )}
               </div>
             )}
@@ -1375,14 +1370,9 @@ export function WeeklyCalendar({
                   Ce coaching duo a été planifié par votre coach.
                 </p>
                 {bookings[selectedSession.id] === "confirmed" && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-3 text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    onClick={() => handleBook(selectedSession)}
-                    loading={booking}
-                  >
-                    Annuler ma participation
-                  </Button>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Pour vous désinscrire de ce cours, veuillez contacter votre coach directement.
+                  </p>
                 )}
               </div>
             )}
