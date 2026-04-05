@@ -20,10 +20,22 @@ export async function POST(request: NextRequest) {
     ? `${memberName} s'est inscrit(e) — ${sessionName} le ${sessionDate} à ${sessionTime}`
     : `${memberName} s'est désinscrit(e) — ${sessionName} le ${sessionDate} à ${sessionTime}`;
 
+  // Only send booking/cancellation notifications to admins
   const adminClient = createAdminClient();
+  const { data: adminProfiles } = await adminClient
+    .from("profiles")
+    .select("user_id")
+    .eq("role", "admin");
+
+  const adminIds = (adminProfiles ?? []).map((p) => p.user_id);
+  if (adminIds.length === 0) {
+    return NextResponse.json({ sent: 0 });
+  }
+
   const { data: subscriptions } = await adminClient
     .from("push_subscriptions")
-    .select("endpoint, p256dh, auth");
+    .select("endpoint, p256dh, auth")
+    .in("user_id", adminIds);
 
   if (!subscriptions || subscriptions.length === 0) {
     return NextResponse.json({ sent: 0 });

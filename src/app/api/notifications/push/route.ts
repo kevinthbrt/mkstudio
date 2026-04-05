@@ -16,10 +16,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
   }
 
+  // Only send to admin users
   const adminClient = createAdminClient();
+  const { data: adminProfiles } = await adminClient
+    .from("profiles")
+    .select("user_id")
+    .eq("role", "admin");
+
+  const adminIds = (adminProfiles ?? []).map((p) => p.user_id);
+  if (adminIds.length === 0) {
+    return NextResponse.json({ sent: 0 });
+  }
+
   const { data: subscriptions } = await adminClient
     .from("push_subscriptions")
-    .select("endpoint, p256dh, auth");
+    .select("endpoint, p256dh, auth")
+    .in("user_id", adminIds);
 
   if (!subscriptions || subscriptions.length === 0) {
     return NextResponse.json({ sent: 0 });
