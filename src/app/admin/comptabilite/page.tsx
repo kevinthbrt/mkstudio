@@ -15,10 +15,8 @@ import {
   ArrowDownCircle,
   BookOpen,
   Receipt,
-  AlertCircle,
 } from "lucide-react";
 import { formatPriceFromEuros } from "@/lib/utils";
-import type { InvoiceSettings } from "@/types/database";
 
 interface Expense {
   id: string;
@@ -60,48 +58,37 @@ const MONTHS_FULL = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-interface UrssafInfo {
-  rate: number;
-  label: string;
-}
-
-function getUrssafInfo(legalStatus: string | null): UrssafInfo | null {
-  if (!legalStatus) return null;
-  const s = legalStatus.toLowerCase();
-  if (
-    s.includes("micro") ||
-    s.includes("auto-entrepreneur") ||
-    s.includes("autoentrepreneur") ||
-    s.includes("auto entrepreneur")
-  ) {
-    if (s.includes("bnc") || s.includes("libéral") || s.includes("liberal")) {
-      return { rate: 0.212, label: "Professions libérales BNC — taux 21,2 %" };
-    }
-    if (s.includes("vente") || s.includes("marchandise")) {
-      return { rate: 0.123, label: "Ventes de marchandises BIC — taux 12,3 %" };
-    }
-    return { rate: 0.212, label: "Prestations de services BIC — taux 21,2 %" };
-  }
-  return null;
-}
-
 type ActiveTab = "journal" | "recettes" | "depenses";
-type UrssafPeriod = "mensuel" | "trimestriel";
+type RecapMode = "mois" | "periode";
+
+function toDateStr(d: Date) {
+  return d.toISOString().split("T")[0];
+}
 
 export default function ComptabilitePage() {
+  const now = new Date();
+
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [orders, setOrders] = useState<OrderEntry[]>([]);
-  const [settings, setSettings] = useState<InvoiceSettings | null>(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [activeTab, setActiveTab] = useState<ActiveTab>("journal");
-  const [urssafPeriod, setUrssafPeriod] = useState<UrssafPeriod>("trimestriel");
+
+  // Recap period state
+  const [recapMode, setRecapMode] = useState<RecapMode>("mois");
+  const [recapMonth, setRecapMonth] = useState(now.getMonth());
+  const [recapFrom, setRecapFrom] = useState(
+    toDateStr(new Date(now.getFullYear(), now.getMonth(), 1))
+  );
+  const [recapTo, setRecapTo] = useState(toDateStr(now));
+
+  // Add expense modal
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [addError, setAddError] = useState("");
   const [expenseForm, setExpenseForm] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: toDateStr(now),
     description: "",
     category: EXPENSE_CATEGORIES[0],
     amount: "",
@@ -113,7 +100,7 @@ export default function ComptabilitePage() {
 
   async function loadData() {
     const supabase = createClient();
-    const [expensesRes, ordersRes, settingsRes] = await Promise.all([
+    const [expensesRes, ordersRes] = await Promise.all([
       fetch("/api/admin/comptabilite"),
       supabase
         .from("orders")
@@ -122,13 +109,11 @@ export default function ComptabilitePage() {
         )
         .eq("status", "paid")
         .order("created_at", { ascending: false }),
-      supabase.from("invoice_settings").select("*").single(),
     ]);
 
     const expData = expensesRes.ok ? await expensesRes.json() : [];
     setExpenses(expData || []);
     setOrders((ordersRes.data as unknown as OrderEntry[]) || []);
-    setSettings(settingsRes.data || null);
     setLoading(false);
   }
 
@@ -144,7 +129,7 @@ export default function ComptabilitePage() {
     if (res.ok) {
       setShowAddExpense(false);
       setExpenseForm({
-        date: new Date().toISOString().split("T")[0],
+        date: toDateStr(now),
         description: "",
         category: EXPENSE_CATEGORIES[0],
         amount: "",
@@ -164,16 +149,15 @@ export default function ComptabilitePage() {
     setDeletingId(null);
   }
 
+  // --- Year-level data ---
   const yearExpenses = useMemo(
     () => expenses.filter((e) => new Date(e.date).getFullYear() === selectedYear),
     [expenses, selectedYear]
   );
-
   const yearOrders = useMemo(
     () => orders.filter((o) => new Date(o.created_at).getFullYear() === selectedYear),
     [orders, selectedYear]
   );
-
   const totalIncome = yearOrders.reduce((s, o) => s + o.amount, 0);
   const totalExpenses = yearExpenses.reduce((s, e) => s + e.amount, 0);
   const profit = totalIncome - totalExpenses;
@@ -191,20 +175,89 @@ export default function ComptabilitePage() {
     [yearOrders, yearExpenses]
   );
 
-  const urssafInfo = getUrssafInfo(settings?.legal_status ?? null);
+  const maxBarValue = Math.max(
+    ...monthlyData.map((m) => Math.max(m.income, m.expense)),
+    1
+  );
 
   const availableYears = useMemo(() => {
-    const years = new Set<number>([new Date().getFullYear()]);
+    const years = new Set<number>([now.getFullYear()]);
     orders.forEach((o) => years.add(new Date(o.created_at).getFullYear()));
     expenses.forEach((e) => years.add(new Date(e.date).getFullYear()));
     return Array.from(years).sort((a, b) => b - a);
   }, [orders, expenses]);
 
+  // --- Recap period data ---
+  const recapPeriodExpenses = useMemo(() => {
+    if (recapMode === "mois") {
+      return expenses.filter((e) => {
+        const d = new Date(e.date);
+        return d.getFullYear() === selectedYear && d.getMonth() === recapMonth;
+      });
+    }
+    const from = new Date(recapFrom);
+    const to = new Date(recapTo);
+    to.setHours(23, 59, 59);
+    return expenses.filter((e) => {
+      const d = new Date(e.date);
+      return d >= from && d <= to;
+    });
+  }, [expenses, recapMode, recapMonth, recapFrom, recapTo, selectedYear]);
+
+  const recapPeriodOrders = useMemo(() => {
+    if (recapMode === "mois") {
+      return orders.filter((o) => {
+        const d = new Date(o.created_at);
+        return d.getFullYear() === selectedYear && d.getMonth() === recapMonth;
+      });
+    }
+    const from = new Date(recapFrom);
+    const to = new Date(recapTo);
+    to.setHours(23, 59, 59);
+    return orders.filter((o) => {
+      const d = new Date(o.created_at);
+      return d >= from && d <= to;
+    });
+  }, [orders, recapMode, recapMonth, recapFrom, recapTo, selectedYear]);
+
+  const recapIncome = recapPeriodOrders.reduce((s, o) => s + o.amount, 0);
+  const recapExpense = recapPeriodExpenses.reduce((s, e) => s + e.amount, 0);
+  const recapProfit = recapIncome - recapExpense;
+
+  const recapJournal = useMemo(() => {
+    const income = recapPeriodOrders.map((o) => ({
+      id: o.id,
+      date: o.created_at,
+      label:
+        `${o.profiles?.first_name ?? ""} ${o.profiles?.last_name ?? ""}`.trim() ||
+        "Client",
+      ref: o.invoice_number,
+      sub: o.products?.name ?? "",
+      type: "recette" as const,
+      amount: o.amount,
+    }));
+    const exp = recapPeriodExpenses.map((e) => ({
+      id: e.id,
+      date: e.date,
+      label: e.description,
+      ref: e.category,
+      sub: "",
+      type: "depense" as const,
+      amount: e.amount,
+    }));
+    return [...income, ...exp].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [recapPeriodOrders, recapPeriodExpenses]);
+
+  // --- Full year journal (for journal tab) ---
   const journalEntries = useMemo(() => {
     const income = yearOrders.map((o) => ({
       id: o.id,
       date: o.created_at,
-      label: `${o.profiles?.first_name ?? ""} ${o.profiles?.last_name ?? ""}`.trim() || "Client",
+      label:
+        `${o.profiles?.first_name ?? ""} ${o.profiles?.last_name ?? ""}`.trim() ||
+        "Client",
       ref: o.invoice_number,
       sub: o.products?.name ?? "",
       type: "recette" as const,
@@ -224,14 +277,10 @@ export default function ComptabilitePage() {
     );
   }, [yearOrders, yearExpenses]);
 
-  const maxBarValue = Math.max(
-    ...monthlyData.map((m) => Math.max(m.income, m.expense)),
-    1
-  );
-
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+  const recapLabel =
+    recapMode === "mois"
+      ? `${MONTHS_FULL[recapMonth]} ${selectedYear}`
+      : `${new Date(recapFrom).toLocaleDateString("fr-FR")} → ${new Date(recapTo).toLocaleDateString("fr-FR")}`;
 
   if (loading) {
     return (
@@ -264,13 +313,13 @@ export default function ComptabilitePage() {
         </select>
       </div>
 
-      {/* KPI Cards */}
+      {/* Annual KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wider">
-                Chiffre d&apos;affaires
+                CA {selectedYear}
               </p>
               <p className="text-2xl font-bold text-[#D4AF37] mt-1">
                 {formatPriceFromEuros(totalIncome)}
@@ -289,7 +338,7 @@ export default function ComptabilitePage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wider">
-                Dépenses
+                Dépenses {selectedYear}
               </p>
               <p className="text-2xl font-bold text-rose-400 mt-1">
                 {formatPriceFromEuros(totalExpenses)}
@@ -308,7 +357,7 @@ export default function ComptabilitePage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wider">
-                Bénéfice net
+                Bénéfice {selectedYear}
               </p>
               <p
                 className={`text-2xl font-bold mt-1 ${
@@ -357,26 +406,44 @@ export default function ComptabilitePage() {
           {monthlyData.map((m, i) => (
             <div
               key={i}
-              className="flex-1 flex flex-col items-center"
+              className="flex-1 flex flex-col items-center cursor-pointer"
               title={`${MONTHS_FULL[i]} : CA ${formatPriceFromEuros(m.income)}, Dépenses ${formatPriceFromEuros(m.expense)}`}
+              onClick={() => {
+                setRecapMode("mois");
+                setRecapMonth(i);
+              }}
             >
               <div className="w-full flex items-end gap-px h-28">
                 <div
-                  className="flex-1 rounded-t-sm bg-[#D4AF37] opacity-80 hover:opacity-100 transition-opacity"
+                  className={`flex-1 rounded-t-sm bg-[#D4AF37] transition-opacity ${
+                    recapMode === "mois" && recapMonth === i
+                      ? "opacity-100"
+                      : "opacity-50 hover:opacity-80"
+                  }`}
                   style={{
                     height: `${(m.income / maxBarValue) * 100}%`,
                     minHeight: m.income > 0 ? "2px" : "0",
                   }}
                 />
                 <div
-                  className="flex-1 rounded-t-sm bg-rose-500 opacity-70 hover:opacity-100 transition-opacity"
+                  className={`flex-1 rounded-t-sm bg-rose-500 transition-opacity ${
+                    recapMode === "mois" && recapMonth === i
+                      ? "opacity-90"
+                      : "opacity-40 hover:opacity-70"
+                  }`}
                   style={{
                     height: `${(m.expense / maxBarValue) * 100}%`,
                     minHeight: m.expense > 0 ? "2px" : "0",
                   }}
                 />
               </div>
-              <span className="text-[9px] text-gray-600 mt-1 leading-none">
+              <span
+                className={`text-[9px] mt-1 leading-none transition-colors ${
+                  recapMode === "mois" && recapMonth === i
+                    ? "text-[#D4AF37] font-semibold"
+                    : "text-gray-600"
+                }`}
+              >
                 {MONTHS_SHORT[i]}
               </span>
             </div>
@@ -384,158 +451,162 @@ export default function ComptabilitePage() {
         </div>
       </Card>
 
-      {/* URSSAF section */}
-      {urssafInfo ? (
-        <Card className="p-4 lg:p-6">
-          <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Déclaration URSSAF
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">{urssafInfo.label}</p>
-            </div>
-            <div className="flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-1 flex-shrink-0">
-              <button
-                onClick={() => setUrssafPeriod("mensuel")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  urssafPeriod === "mensuel"
-                    ? "bg-[#D4AF37] text-black"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Mensuel
-              </button>
-              <button
-                onClick={() => setUrssafPeriod("trimestriel")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  urssafPeriod === "trimestriel"
-                    ? "bg-[#D4AF37] text-black"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Trimestriel
-              </button>
-            </div>
-          </div>
-
-          {urssafPeriod === "trimestriel" ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((q) => {
-                const qMonths = [q * 3, q * 3 + 1, q * 3 + 2];
-                const quarterCA = qMonths.reduce(
-                  (s, m) => s + monthlyData[m].income,
-                  0
-                );
-                const cotisations = quarterCA * urssafInfo.rate;
-                const isCurrent =
-                  selectedYear === currentYear &&
-                  qMonths.includes(currentMonth);
-                return (
-                  <div
-                    key={q}
-                    className={`p-3 rounded-xl border ${
-                      isCurrent
-                        ? "border-[#D4AF37]/30 bg-[#D4AF37]/5"
-                        : "border-[#1f1f1f] bg-[#111111]"
-                    }`}
-                  >
-                    <p className="text-xs font-semibold text-gray-400 mb-2">
-                      T{q + 1} —{" "}
-                      {MONTHS_SHORT[q * 3]}/{MONTHS_SHORT[q * 3 + 2]}
-                      {isCurrent && (
-                        <span className="ml-1.5 text-[#D4AF37]">●</span>
-                      )}
-                    </p>
-                    <p className="text-white font-bold text-sm">
-                      {formatPriceFromEuros(quarterCA)}
-                    </p>
-                    <p className="text-gray-500 text-xs">CA du trimestre</p>
-                    <div className="mt-2 pt-2 border-t border-[#2a2a2a]">
-                      <p className="text-[#D4AF37] font-bold text-sm">
-                        {formatPriceFromEuros(cotisations)}
-                      </p>
-                      <p className="text-gray-600 text-xs">Cotisations est.</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {Array.from({ length: 12 }, (_, i) => {
-                const monthCA = monthlyData[i].income;
-                const cotisations = monthCA * urssafInfo.rate;
-                const isCurrent =
-                  selectedYear === currentYear && i === currentMonth;
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isCurrent
-                        ? "border-[#D4AF37]/20 bg-[#D4AF37]/5"
-                        : "border-[#1f1f1f] bg-[#111111]"
-                    }`}
-                  >
-                    <span
-                      className={`text-sm font-medium ${
-                        isCurrent ? "text-[#D4AF37]" : "text-gray-300"
-                      }`}
-                    >
-                      {MONTHS_FULL[i]}
-                      {isCurrent && (
-                        <span className="ml-2 text-xs text-[#D4AF37]/60">
-                          mois en cours
-                        </span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-6 text-right">
-                      <div>
-                        <p className="text-white text-sm font-medium">
-                          {formatPriceFromEuros(monthCA)}
-                        </p>
-                        <p className="text-gray-600 text-xs">CA</p>
-                      </div>
-                      <div>
-                        <p className="text-[#D4AF37] text-sm font-medium">
-                          {formatPriceFromEuros(cotisations)}
-                        </p>
-                        <p className="text-gray-600 text-xs">Cotisations</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="mt-3 flex items-start gap-2 bg-amber-500/5 border border-amber-500/15 rounded-lg p-3">
-            <AlertCircle size={13} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-400/80">
-              Estimation indicative. Vérifiez les taux en vigueur sur{" "}
-              <span className="underline">autoentrepreneur.urssaf.fr</span>
+      {/* Period recap */}
+      <Card className="p-4 lg:p-6">
+        <div className="flex items-start justify-between gap-3 mb-5 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold text-white">
+              Récapitulatif — {recapLabel}
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {recapJournal.length} entrée{recapJournal.length !== 1 ? "s" : ""}
             </p>
           </div>
-        </Card>
-      ) : (
-        settings && (
-          <Card className="p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-500">
-                Le calcul URSSAF n&apos;est pas disponible pour ce statut juridique (
-                <span className="text-gray-400">{settings.legal_status || "non renseigné"}</span>
-                ). Configurez un statut micro-entrepreneur dans les{" "}
-                <a href="/admin/settings" className="text-[#D4AF37] underline">
-                  Paramètres
-                </a>
-                .
-              </p>
-            </div>
-          </Card>
-        )
-      )}
+          <div className="flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-1 flex-shrink-0">
+            <button
+              onClick={() => setRecapMode("mois")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                recapMode === "mois"
+                  ? "bg-[#D4AF37] text-black"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Mois
+            </button>
+            <button
+              onClick={() => setRecapMode("periode")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                recapMode === "periode"
+                  ? "bg-[#D4AF37] text-black"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Période libre
+            </button>
+          </div>
+        </div>
 
-      {/* Journal */}
+        {/* Month selector */}
+        {recapMode === "mois" && (
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            {MONTHS_SHORT.map((m, i) => (
+              <button
+                key={i}
+                onClick={() => setRecapMonth(i)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  recapMonth === i
+                    ? "bg-[#D4AF37] text-black"
+                    : "bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#3a3a3a]"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Date range selector */}
+        {recapMode === "periode" && (
+          <div className="flex items-center gap-3 mb-5 flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs text-gray-500 mb-1">Du</label>
+              <input
+                type="date"
+                value={recapFrom}
+                onChange={(e) => setRecapFrom(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+            <span className="text-gray-600 text-sm mt-4">→</span>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs text-gray-500 mb-1">Au</label>
+              <input
+                type="date"
+                value={recapTo}
+                onChange={(e) => setRecapTo(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Period KPIs */}
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+            <p className="text-gray-500 text-xs">Recettes</p>
+            <p className="text-[#D4AF37] font-bold text-base mt-0.5">
+              {formatPriceFromEuros(recapIncome)}
+            </p>
+          </div>
+          <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+            <p className="text-gray-500 text-xs">Dépenses</p>
+            <p className="text-rose-400 font-bold text-base mt-0.5">
+              {formatPriceFromEuros(recapExpense)}
+            </p>
+          </div>
+          <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+            <p className="text-gray-500 text-xs">Bénéfice</p>
+            <p
+              className={`font-bold text-base mt-0.5 ${
+                recapProfit >= 0 ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {formatPriceFromEuros(recapProfit)}
+            </p>
+          </div>
+        </div>
+
+        {/* Period journal */}
+        {recapJournal.length === 0 ? (
+          <div className="text-center py-6">
+            <BookOpen size={28} className="text-gray-700 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">Aucune entrée sur cette période</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {recapJournal.map((entry) => (
+              <div
+                key={`${entry.type}-${entry.id}`}
+                className="flex items-center gap-3 p-3 rounded-lg bg-[#0e0d14] border border-[#1a1a1a]"
+              >
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    entry.type === "recette"
+                      ? "bg-[#D4AF37]/10"
+                      : "bg-rose-500/10"
+                  }`}
+                >
+                  {entry.type === "recette" ? (
+                    <ArrowUpCircle size={14} className="text-[#D4AF37]" />
+                  ) : (
+                    <ArrowDownCircle size={14} className="text-rose-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">
+                    {entry.label}
+                  </p>
+                  <p className="text-gray-600 text-xs truncate">
+                    {entry.ref}
+                    {entry.sub ? ` — ${entry.sub}` : ""} —{" "}
+                    {new Date(entry.date).toLocaleDateString("fr-FR")}
+                  </p>
+                </div>
+                <p
+                  className={`font-bold text-sm flex-shrink-0 ${
+                    entry.type === "recette" ? "text-[#D4AF37]" : "text-rose-400"
+                  }`}
+                >
+                  {entry.type === "recette" ? "+" : "−"}
+                  {formatPriceFromEuros(entry.amount)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Full year journal */}
       <Card className="p-4 lg:p-6">
         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <div className="flex items-center gap-1 bg-[#111111] border border-[#1f1f1f] rounded-lg p-1">
@@ -550,7 +621,7 @@ export default function ComptabilitePage() {
                 }`}
               >
                 {tab === "journal"
-                  ? "Journal"
+                  ? `Journal (${journalEntries.length})`
                   : tab === "recettes"
                   ? `Recettes (${yearOrders.length})`
                   : `Dépenses (${yearExpenses.length})`}
