@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
+  BookOpen,
   Calendar,
   CreditCard,
   Home,
@@ -41,6 +42,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/members", label: "Adhérents", icon: <Users size={18} /> },
   { href: "/admin/products", label: "Produits", icon: <Package size={18} /> },
   { href: "/admin/orders", label: "Ventes", icon: <CreditCard size={18} /> },
+  { href: "/admin/comptabilite", label: "Comptabilité", shortLabel: "Compta", icon: <BookOpen size={18} /> },
   { href: "/admin/settings", label: "Paramètres", icon: <Settings size={18} /> },
 ];
 
