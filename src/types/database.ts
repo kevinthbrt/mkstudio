@@ -360,6 +360,31 @@ export interface Database {
         };
         Relationships: [];
       };
+      manual_incomes: {
+        Row: {
+          id: string;
+          date: string;
+          description: string;
+          amount: number;
+          payment_method: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date: string;
+          description: string;
+          amount: number;
+          payment_method?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          date?: string;
+          description?: string;
+          amount?: number;
+          payment_method?: string | null;
+        };
+        Relationships: [];
+      };
       class_waitlists: {
         Row: {
           id: string;
@@ -462,3 +487,4 @@ export type ClassSession = Database["public"]["Tables"]["class_sessions"]["Row"]
 export type ClassBooking = Database["public"]["Tables"]["class_bookings"]["Row"];
 export type WaitlistEntry = Database["public"]["Tables"]["class_waitlists"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+export type ManualIncome = Database["public"]["Tables"]["manual_incomes"]["Row"];

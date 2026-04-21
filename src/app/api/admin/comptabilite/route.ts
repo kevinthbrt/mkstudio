@@ -22,29 +22,27 @@ async function getAdminClient() {
 
 export async function GET() {
   const { error, status, supabase } = await getAdminClient();
-  if (error || !supabase)
-    return NextResponse.json({ error }, { status });
+  if (error || !supabase) return NextResponse.json({ error }, { status });
 
-  const { data, error: dbError } = await supabase
-    .from("expenses")
-    .select("*")
-    .order("date", { ascending: false });
+  const [expensesRes, incomesRes] = await Promise.all([
+    supabase.from("expenses").select("*").order("date", { ascending: false }),
+    supabase.from("manual_incomes").select("*").order("date", { ascending: false }),
+  ]);
 
-  if (dbError)
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
-
-  return NextResponse.json(data || []);
+  return NextResponse.json({
+    expenses: expensesRes.data || [],
+    manual_incomes: incomesRes.data || [],
+  });
 }
 
 export async function POST(request: Request) {
   const { error, status, supabase } = await getAdminClient();
-  if (error || !supabase)
-    return NextResponse.json({ error }, { status });
+  if (error || !supabase) return NextResponse.json({ error }, { status });
 
   const body = await request.json();
-  const { date, description, category, amount } = body;
+  const { type, date, description, amount } = body;
 
-  if (!date || !description || !category || !amount) {
+  if (!date || !description || !amount) {
     return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
   }
 
@@ -53,37 +51,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
   }
 
+  if (type === "income") {
+    const { data, error: dbError } = await supabase
+      .from("manual_incomes")
+      .insert({ date, description, amount: parsedAmount, payment_method: body.payment_method || null })
+      .select()
+      .single();
+    if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return NextResponse.json(data, { status: 201 });
+  }
+
+  // default: expense
+  const { category } = body;
+  if (!category) return NextResponse.json({ error: "Catégorie manquante" }, { status: 400 });
+
   const { data, error: dbError } = await supabase
     .from("expenses")
     .insert({ date, description, category, amount: parsedAmount })
     .select()
     .single();
 
-  if (dbError)
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
-
+  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
 }
 
 export async function DELETE(request: Request) {
   const { error, status, supabase } = await getAdminClient();
-  if (error || !supabase)
-    return NextResponse.json({ error }, { status });
+  if (error || !supabase) return NextResponse.json({ error }, { status });
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const type = searchParams.get("type");
 
-  if (!id) {
-    return NextResponse.json({ error: "ID manquant" }, { status: 400 });
-  }
+  if (!id) return NextResponse.json({ error: "ID manquant" }, { status: 400 });
 
-  const { error: dbError } = await supabase
-    .from("expenses")
-    .delete()
-    .eq("id", id);
+  const table = type === "income" ? "manual_incomes" : "expenses";
+  const { error: dbError } = await supabase.from(table).delete().eq("id", id);
 
-  if (dbError)
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
-
+  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
