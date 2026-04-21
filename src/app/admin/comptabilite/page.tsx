@@ -40,10 +40,11 @@ interface OrderEntry {
   id: string;
   invoice_number: string;
   amount: number;
+  sessions_purchased: number;
   created_at: string;
   payment_method: string | null;
   profiles: { first_name: string; last_name: string } | null;
-  products: { name: string } | null;
+  products: { name: string; session_type: string } | null;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -85,7 +86,20 @@ type ActiveTab = "journal" | "recettes" | "depenses";
 type RecapMode = "mois" | "periode";
 
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Parse YYYY-MM-DD as local date (new Date("YYYY-MM-DD") is UTC midnight, which
+// shifts into the previous calendar day for browsers west of UTC)
+function parseDate(s: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, mo, d] = s.split("-").map(Number);
+    return new Date(y, mo - 1, d);
+  }
+  return new Date(s);
 }
 
 interface JournalEntry {
@@ -149,7 +163,7 @@ export default function ComptabilitePage() {
       fetch("/api/admin/comptabilite"),
       supabase
         .from("orders")
-        .select("id, invoice_number, amount, created_at, payment_method, profiles(first_name, last_name), products(name)")
+        .select("id, invoice_number, amount, sessions_purchased, created_at, payment_method, profiles(first_name, last_name), products(name, session_type)")
         .eq("status", "paid")
         .order("created_at", { ascending: false }),
     ]);
@@ -213,11 +227,11 @@ export default function ComptabilitePage() {
 
   // --- Year-level data ---
   const yearExpenses = useMemo(
-    () => expenses.filter((e) => new Date(e.date).getFullYear() === selectedYear),
+    () => expenses.filter((e) => parseDate(e.date).getFullYear() === selectedYear),
     [expenses, selectedYear]
   );
   const yearManualIncomes = useMemo(
-    () => manualIncomes.filter((i) => new Date(i.date).getFullYear() === selectedYear),
+    () => manualIncomes.filter((i) => parseDate(i.date).getFullYear() === selectedYear),
     [manualIncomes, selectedYear]
   );
   const yearOrders = useMemo(
@@ -236,8 +250,8 @@ export default function ComptabilitePage() {
       Array.from({ length: 12 }, (_, i) => ({
         income:
           yearOrders.filter((o) => new Date(o.created_at).getMonth() === i).reduce((s, o) => s + o.amount, 0) +
-          yearManualIncomes.filter((m) => new Date(m.date).getMonth() === i).reduce((s, m) => s + m.amount, 0),
-        expense: yearExpenses.filter((e) => new Date(e.date).getMonth() === i).reduce((s, e) => s + e.amount, 0),
+          yearManualIncomes.filter((m) => parseDate(m.date).getMonth() === i).reduce((s, m) => s + m.amount, 0),
+        expense: yearExpenses.filter((e) => parseDate(e.date).getMonth() === i).reduce((s, e) => s + e.amount, 0),
       })),
     [yearOrders, yearManualIncomes, yearExpenses]
   );
@@ -247,20 +261,19 @@ export default function ComptabilitePage() {
   const availableYears = useMemo(() => {
     const years = new Set<number>([now.getFullYear()]);
     orders.forEach((o) => years.add(new Date(o.created_at).getFullYear()));
-    expenses.forEach((e) => years.add(new Date(e.date).getFullYear()));
-    manualIncomes.forEach((i) => years.add(new Date(i.date).getFullYear()));
+    expenses.forEach((e) => years.add(parseDate(e.date).getFullYear()));
+    manualIncomes.forEach((i) => years.add(parseDate(i.date).getFullYear()));
     return Array.from(years).sort((a, b) => b - a);
   }, [orders, expenses, manualIncomes]);
 
   // --- Recap period ---
   function inPeriod(dateStr: string) {
+    const d = parseDate(dateStr);
     if (recapMode === "mois") {
-      const d = new Date(dateStr);
       return d.getFullYear() === selectedYear && d.getMonth() === recapMonth;
     }
-    const d = new Date(dateStr);
-    const from = new Date(recapFrom);
-    const to = new Date(recapTo);
+    const from = parseDate(recapFrom);
+    const to = parseDate(recapTo);
     to.setHours(23, 59, 59);
     return d >= from && d <= to;
   }
@@ -376,14 +389,50 @@ export default function ComptabilitePage() {
     );
   }, [yearOrders, yearManualIncomes, yearExpenses]);
 
-  const allYearRecettes = [...yearOrders.map((o) => ({ ...o, isManual: false })), ...yearManualIncomes.map((i) => ({ ...i, isManual: true, invoice_number: "Manuelle", profiles: null, products: null, created_at: i.date }))].sort(
-    (a, b) => new Date(b.created_at ?? b.date ?? "").getTime() - new Date(a.created_at ?? a.date ?? "").getTime()
-  );
+  const allYearRecettes = [
+    ...yearOrders.map((o) => ({ ...o, isManual: false as const })),
+    ...yearManualIncomes.map((i) => ({
+      ...i,
+      isManual: true as const,
+      invoice_number: "Manuelle",
+      profiles: null as null,
+      products: null as null,
+      sessions_purchased: 0,
+      created_at: i.date,
+    })),
+  ].sort((a, b) => parseDate(b.created_at).getTime() - parseDate(a.created_at).getTime());
+
+  // Sales breakdown by session type for the selected year
+  const salesByType = useMemo(() => {
+    const types = [
+      { key: "collective", label: "Collectif", color: "text-[#D4AF37]", bg: "bg-[#D4AF37]/10" },
+      { key: "individual", label: "Solo", color: "text-blue-400", bg: "bg-blue-500/10" },
+      { key: "duo", label: "Duo", color: "text-purple-400", bg: "bg-purple-500/10" },
+    ];
+    return types
+      .map(({ key, label, color, bg }) => {
+        const typeOrders = yearOrders.filter((o) => o.products?.session_type === key);
+        const totalRevenue = typeOrders.reduce((s, o) => s + o.amount, 0);
+        const totalSessions = typeOrders.reduce((s, o) => s + o.sessions_purchased, 0);
+        return {
+          key,
+          label,
+          color,
+          bg,
+          totalRevenue,
+          totalSessions,
+          revenuePerSession: totalSessions > 0 ? totalRevenue / totalSessions : 0,
+          count: typeOrders.length,
+        };
+      })
+      .filter((t) => t.count > 0)
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }, [yearOrders]);
 
   const recapLabel =
     recapMode === "mois"
       ? `${MONTHS_FULL[recapMonth]} ${selectedYear}`
-      : `${new Date(recapFrom).toLocaleDateString("fr-FR")} → ${new Date(recapTo).toLocaleDateString("fr-FR")}`;
+      : `${parseDate(recapFrom).toLocaleDateString("fr-FR")} → ${parseDate(recapTo).toLocaleDateString("fr-FR")}`;
 
   if (loading) {
     return (
@@ -498,6 +547,56 @@ export default function ComptabilitePage() {
           ))}
         </div>
       </Card>
+
+      {/* Sales by type */}
+      {salesByType.length > 0 && (
+        <Card className="p-4 lg:p-6">
+          <h2 className="text-sm font-semibold text-white mb-4">Ventes par type — {selectedYear}</h2>
+          <div className="space-y-3">
+            {/* Brut ranking */}
+            <p className="text-xs text-gray-500 uppercase tracking-wider">CA brut</p>
+            {salesByType.map((t) => {
+              const pct = totalIncome > 0 ? (t.totalRevenue / totalIncome) * 100 : 0;
+              return (
+                <div key={t.key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-medium ${t.color}`}>{t.label}</span>
+                    <div className="flex items-center gap-3 text-right">
+                      <span className="text-gray-500 text-xs">{t.count} vente{t.count !== 1 ? "s" : ""} · {t.totalSessions} séance{t.totalSessions !== 1 ? "s" : ""}</span>
+                      <span className="text-white font-bold text-sm w-20 text-right">{formatPriceFromEuros(t.totalRevenue)}</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${t.bg.replace("/10", "/60")}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Per session ranking */}
+          {salesByType.some((t) => t.totalSessions > 0) && (
+            <div className="mt-5 pt-4 border-t border-[#1f1f1f]">
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Revenu par séance (rentabilité)</p>
+              <div className="flex gap-3 flex-wrap">
+                {[...salesByType]
+                  .filter((t) => t.totalSessions > 0)
+                  .sort((a, b) => b.revenuePerSession - a.revenuePerSession)
+                  .map((t, rank) => (
+                    <div key={t.key} className={`flex-1 min-w-[100px] p-3 rounded-xl border ${t.bg} border-[#1f1f1f]`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {rank === 0 && <span className="text-[10px]">🥇</span>}
+                        <span className={`text-xs font-semibold ${t.color}`}>{t.label}</span>
+                      </div>
+                      <p className="text-white font-bold text-base">{formatPriceFromEuros(t.revenuePerSession)}</p>
+                      <p className="text-gray-600 text-xs mt-0.5">/ séance</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Period recap */}
       <Card className="p-4 lg:p-6">
