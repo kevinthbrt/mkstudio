@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { Users, CreditCard, Calendar, ArrowRight, Cake, UserCheck } from "lucide-react";
 import { formatPriceFromEuros } from "@/lib/utils";
 import Link from "next/link";
-import { PushNotificationSetup } from "@/components/PushNotificationSetup";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -122,28 +121,6 @@ export default async function AdminDashboard() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
-      {/* Header */}
-      <div
-        className="relative overflow-hidden rounded-3xl p-6"
-        style={{
-          background: "linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0.02) 60%, transparent 100%)",
-          border: "1px solid rgba(212,175,55,0.12)",
-        }}
-      >
-        <div
-          className="absolute top-0 right-0 w-48 h-48 pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
-        />
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-[#D4AF37]/60 uppercase tracking-widest mb-1">Administration</p>
-            <h1 className="text-2xl font-black text-white tracking-tight">Accueil</h1>
-            <p className="text-gray-500 text-sm mt-1">Vue d&apos;ensemble de MK Studio</p>
-          </div>
-          <PushNotificationSetup />
-        </div>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div
