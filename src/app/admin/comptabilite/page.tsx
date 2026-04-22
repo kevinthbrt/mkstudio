@@ -131,6 +131,9 @@ export default function ComptabilitePage() {
   );
   const [recapTo, setRecapTo] = useState(toDateStr(now));
 
+  // Sales-by-type period selector (null = full year)
+  const [typeMonth, setTypeMonth] = useState<number | null>(null);
+
   // Add expense modal
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
@@ -402,6 +405,35 @@ export default function ComptabilitePage() {
     })),
   ].sort((a, b) => parseDate(b.created_at).getTime() - parseDate(a.created_at).getTime());
 
+  // Type section: orders/expenses/incomes filtered by selected month (or full year)
+  const typeOrders = useMemo(
+    () =>
+      typeMonth === null
+        ? yearOrders
+        : yearOrders.filter((o) => new Date(o.created_at).getMonth() === typeMonth),
+    [yearOrders, typeMonth]
+  );
+  const typeExpenses = useMemo(
+    () =>
+      typeMonth === null
+        ? yearExpenses
+        : yearExpenses.filter((e) => parseDate(e.date).getMonth() === typeMonth),
+    [yearExpenses, typeMonth]
+  );
+  const typeManualIncomes = useMemo(
+    () =>
+      typeMonth === null
+        ? yearManualIncomes
+        : yearManualIncomes.filter((i) => parseDate(i.date).getMonth() === typeMonth),
+    [yearManualIncomes, typeMonth]
+  );
+
+  const typeIncome =
+    typeOrders.reduce((s, o) => s + o.amount, 0) +
+    typeManualIncomes.reduce((s, i) => s + i.amount, 0);
+  const typeExpenseTotal = typeExpenses.reduce((s, e) => s + e.amount, 0);
+  const typeProfit = typeIncome - typeExpenseTotal;
+
   // Sales breakdown by session type for the selected year
   const salesByType = useMemo(() => {
     const types = [
@@ -411,9 +443,9 @@ export default function ComptabilitePage() {
     ];
     return types
       .map(({ key, label, color, bg }) => {
-        const typeOrders = yearOrders.filter((o) => o.products?.session_type === key);
-        const totalRevenue = typeOrders.reduce((s, o) => s + o.amount, 0);
-        const totalSessions = typeOrders.reduce((s, o) => s + o.sessions_purchased, 0);
+        const filteredOrders = typeOrders.filter((o) => o.products?.session_type === key);
+        const totalRevenue = filteredOrders.reduce((s, o) => s + o.amount, 0);
+        const totalSessions = filteredOrders.reduce((s, o) => s + o.sessions_purchased, 0);
         return {
           key,
           label,
@@ -422,12 +454,12 @@ export default function ComptabilitePage() {
           totalRevenue,
           totalSessions,
           revenuePerSession: totalSessions > 0 ? totalRevenue / totalSessions : 0,
-          count: typeOrders.length,
+          count: filteredOrders.length,
         };
       })
       .filter((t) => t.count > 0)
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [yearOrders]);
+  }, [typeOrders]);
 
   const recapLabel =
     recapMode === "mois"
@@ -549,51 +581,103 @@ export default function ComptabilitePage() {
       </Card>
 
       {/* Sales by type */}
-      {salesByType.length > 0 && (
+      {(salesByType.length > 0 || typeOrders.length > 0 || yearOrders.length > 0) && (
         <Card className="p-4 lg:p-6">
-          <h2 className="text-sm font-semibold text-white mb-4">Ventes par type — {selectedYear}</h2>
-          <div className="space-y-3">
-            {/* Brut ranking */}
-            <p className="text-xs text-gray-500 uppercase tracking-wider">CA brut</p>
-            {salesByType.map((t) => {
-              const pct = totalIncome > 0 ? (t.totalRevenue / totalIncome) * 100 : 0;
-              return (
-                <div key={t.key}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-sm font-medium ${t.color}`}>{t.label}</span>
-                    <div className="flex items-center gap-3 text-right">
-                      <span className="text-gray-500 text-xs">{t.count} vente{t.count !== 1 ? "s" : ""} · {t.totalSessions} séance{t.totalSessions !== 1 ? "s" : ""}</span>
-                      <span className="text-white font-bold text-sm w-20 text-right">{formatPriceFromEuros(t.totalRevenue)}</span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${t.bg.replace("/10", "/60")}`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+          {/* Header + month selector */}
+          <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Ventes par type</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {typeMonth === null ? `Année ${selectedYear}` : `${MONTHS_FULL[typeMonth]} ${selectedYear}`}
+              </p>
+            </div>
           </div>
 
-          {/* Per session ranking */}
-          {salesByType.some((t) => t.totalSessions > 0) && (
-            <div className="mt-5 pt-4 border-t border-[#1f1f1f]">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Revenu par séance (rentabilité)</p>
-              <div className="flex gap-3 flex-wrap">
-                {[...salesByType]
-                  .filter((t) => t.totalSessions > 0)
-                  .sort((a, b) => b.revenuePerSession - a.revenuePerSession)
-                  .map((t, rank) => (
-                    <div key={t.key} className={`flex-1 min-w-[100px] p-3 rounded-xl border ${t.bg} border-[#1f1f1f]`}>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        {rank === 0 && <span className="text-[10px]">🥇</span>}
-                        <span className={`text-xs font-semibold ${t.color}`}>{t.label}</span>
-                      </div>
-                      <p className="text-white font-bold text-base">{formatPriceFromEuros(t.revenuePerSession)}</p>
-                      <p className="text-gray-600 text-xs mt-0.5">/ séance</p>
-                    </div>
-                  ))}
-              </div>
+          {/* Month chips */}
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            <button
+              onClick={() => setTypeMonth(null)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${typeMonth === null ? "bg-[#D4AF37] text-black" : "bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400 hover:text-white"}`}
+            >
+              Tout
+            </button>
+            {MONTHS_SHORT.map((m, i) => (
+              <button
+                key={i}
+                onClick={() => setTypeMonth(i)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${typeMonth === i ? "bg-[#D4AF37] text-black" : "bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400 hover:text-white"}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+
+          {/* Period totals */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+              <p className="text-gray-500 text-xs">Recettes</p>
+              <p className="text-[#D4AF37] font-bold text-base mt-0.5">{formatPriceFromEuros(typeIncome)}</p>
             </div>
+            <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+              <p className="text-gray-500 text-xs">Dépenses</p>
+              <p className="text-rose-400 font-bold text-base mt-0.5">{formatPriceFromEuros(typeExpenseTotal)}</p>
+            </div>
+            <div className="bg-[#111111] border border-[#1f1f1f] rounded-xl p-3">
+              <p className="text-gray-500 text-xs">Bénéfice</p>
+              <p className={`font-bold text-base mt-0.5 ${typeProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {formatPriceFromEuros(typeProfit)}
+              </p>
+            </div>
+          </div>
+
+          {salesByType.length === 0 ? (
+            <p className="text-gray-600 text-sm text-center py-4">Aucune vente sur cette période</p>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {/* Brut ranking */}
+                <p className="text-xs text-gray-500 uppercase tracking-wider">CA brut</p>
+                {salesByType.map((t) => {
+                  const pct = totalIncome > 0 ? (t.totalRevenue / totalIncome) * 100 : 0;
+                  return (
+                    <div key={t.key}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-sm font-medium ${t.color}`}>{t.label}</span>
+                        <div className="flex items-center gap-3 text-right">
+                          <span className="text-gray-500 text-xs">{t.count} vente{t.count !== 1 ? "s" : ""} · {t.totalSessions} séance{t.totalSessions !== 1 ? "s" : ""}</span>
+                          <span className="text-white font-bold text-sm w-20 text-right">{formatPriceFromEuros(t.totalRevenue)}</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${t.bg.replace("/10", "/60")}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Per session ranking */}
+              {salesByType.some((t) => t.totalSessions > 0) && (
+                <div className="mt-5 pt-4 border-t border-[#1f1f1f]">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Revenu par séance (rentabilité)</p>
+                  <div className="flex gap-3 flex-wrap">
+                    {[...salesByType]
+                      .filter((t) => t.totalSessions > 0)
+                      .sort((a, b) => b.revenuePerSession - a.revenuePerSession)
+                      .map((t, rank) => (
+                        <div key={t.key} className={`flex-1 min-w-[100px] p-3 rounded-xl border ${t.bg} border-[#1f1f1f]`}>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {rank === 0 && <span className="text-[10px]">🥇</span>}
+                            <span className={`text-xs font-semibold ${t.color}`}>{t.label}</span>
+                          </div>
+                          <p className="text-white font-bold text-base">{formatPriceFromEuros(t.revenuePerSession)}</p>
+                          <p className="text-gray-600 text-xs mt-0.5">/ séance</p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </Card>
       )}
