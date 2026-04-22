@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { Users, CreditCard, Calendar, ArrowRight, Cake, UserCheck } from "lucide-react";
-import { formatPriceFromEuros } from "@/lib/utils";
+import { Users, Calendar, ArrowRight, Cake, UserCheck } from "lucide-react";
 import Link from "next/link";
+import { PushNotificationSetup } from "@/components/PushNotificationSetup";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export default async function AdminDashboard() {
 
   const [
     { count: totalMembers },
-    { data: allOrders },
+    {},
     { data: membersWithBirthday },
     { data: weekSessionsRaw },
   ] = await Promise.all([
@@ -26,7 +26,7 @@ export default async function AdminDashboard() {
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("role", "member"),
-    supabase.from("orders").select("amount"),
+    supabase.from("orders").select("id", { count: "exact", head: true }),
     supabase
       .from("profiles")
       .select("first_name, last_name, date_of_birth")
@@ -84,8 +84,6 @@ export default async function AdminDashboard() {
     bookingsBySession.get(b.class_session_id)!.push(b);
   }
 
-  const totalRevenue = (allOrders || []).reduce((s, o) => s + o.amount, 0);
-
   // Upcoming birthdays (next 30 days)
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const upcomingBirthdays = (membersWithBirthday || [])
@@ -121,31 +119,25 @@ export default async function AdminDashboard() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Header */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-6"
+        style={{
+          background: "linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0.02) 60%, transparent 100%)",
+          border: "1px solid rgba(212,175,55,0.12)",
+        }}
+      >
         <div
-          className="rounded-2xl p-4 flex items-center gap-3"
-          style={{ background: "linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(30,28,45,0.8) 100%)", border: "1px solid rgba(212,175,55,0.15)" }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/15 flex items-center justify-center flex-shrink-0">
-            <Users size={18} className="text-[#D4AF37]" />
-          </div>
+          className="absolute top-0 right-0 w-48 h-48 pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)", transform: "translate(30%, -30%)" }}
+        />
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-gray-500 text-xs">Adhérents</p>
-            <p className="text-white font-black text-xl leading-tight">{totalMembers ?? 0}</p>
+            <p className="text-xs font-semibold text-[#D4AF37]/60 uppercase tracking-widest mb-1">Administration</p>
+            <h1 className="text-2xl font-black text-white tracking-tight">Accueil</h1>
+            <p className="text-gray-500 text-sm mt-1">Vue d&apos;ensemble de MK Studio</p>
           </div>
-        </div>
-        <div
-          className="rounded-2xl p-4 flex items-center gap-3"
-          style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(30,28,45,0.8) 100%)", border: "1px solid rgba(34,197,94,0.12)" }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center flex-shrink-0">
-            <CreditCard size={18} className="text-green-400" />
-          </div>
-          <div>
-            <p className="text-gray-500 text-xs">Chiffre d&apos;affaires</p>
-            <p className="text-white font-black text-xl leading-tight">{formatPriceFromEuros(totalRevenue)}</p>
-          </div>
+          <PushNotificationSetup />
         </div>
       </div>
 
