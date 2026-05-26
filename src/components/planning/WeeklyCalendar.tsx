@@ -246,18 +246,9 @@ export function WeeklyCalendar({
       const data = await res.json();
       setSessionBookees(Array.isArray(data) ? data : []);
     } else {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("class_bookings")
-        .select("guest_names, profiles (first_name, last_name)")
-        .eq("class_session_id", sessionId)
-        .eq("status", "confirmed");
-      setSessionBookees(
-        ((data as any[]) || []).map((b) => ({
-          name: `${b.profiles?.first_name ?? ""} ${b.profiles?.last_name ?? ""}`.trim(),
-          guest_names: b.guest_names,
-        }))
-      );
+      const res = await fetch(`/api/sessions/participants?session_id=${sessionId}`);
+      const data = await res.json();
+      setSessionBookees(Array.isArray(data) ? data : []);
     }
     setLoadingBookees(false);
   }
@@ -925,6 +916,9 @@ export function WeeklyCalendar({
                         refreshSessionParticipants(session.id);
                         if (session.session_type === "collective") loadAdminWaitlist(session.id);
                       }
+                      if (!isAdmin && session.session_type === "collective") {
+                        loadSessionBookees(session.id);
+                      }
                     }}
                   >
                     <div className="flex items-start gap-2">
@@ -1064,11 +1058,15 @@ export function WeeklyCalendar({
                         onClick={() => {
                           setSelectedSession(session);
                           setBookingError("");
+                          setSessionBookees([]);
                           setAdminWaitlist([]);
                           if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
                             loadSessionBookees(session.id);
                             refreshSessionParticipants(session.id);
                             if (session.session_type === "collective") loadAdminWaitlist(session.id);
+                          }
+                          if (!isAdmin && session.session_type === "collective") {
+                            loadSessionBookees(session.id);
                           }
                         }}
                       >
@@ -1219,6 +1217,33 @@ export function WeeklyCalendar({
 
             {selectedSession.class_types.description && (
               <p className="text-gray-400 text-sm">{selectedSession.class_types.description}</p>
+            )}
+
+            {!isAdmin && selectedSession.session_type === "collective" && (
+              <div className="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Users size={14} className="text-gray-400" />
+                  <p className="text-xs font-medium text-gray-400">
+                    Inscrits ({selectedSession.current_participants}/{selectedSession.max_participants})
+                  </p>
+                </div>
+                {loadingBookees ? (
+                  <p className="text-xs text-gray-600">Chargement...</p>
+                ) : sessionBookees.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {sessionBookees.map((b, i) => (
+                      <li key={i} className="text-xs text-gray-300">
+                        • {b.name}
+                        {b.guest_names && (
+                          <span className="text-gray-500"> + {b.guest_names}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-gray-600 italic">Aucun inscrit pour l&apos;instant</p>
+                )}
+              </div>
             )}
 
             {bookingError && (
