@@ -25,6 +25,7 @@ export interface Database {
           charter_accepted_at: string | null;
           date_of_birth: string | null;
           is_test_account: boolean;
+          marketing_opt_in: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -43,6 +44,7 @@ export interface Database {
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
           is_test_account?: boolean;
+          marketing_opt_in?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,7 +63,38 @@ export interface Database {
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
           is_test_account?: boolean;
+          marketing_opt_in?: boolean;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      email_campaigns: {
+        Row: {
+          id: string;
+          type: "announcement" | "promotion" | "massage";
+          subject: string;
+          title: string;
+          recipient_count: number;
+          sent_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: "announcement" | "promotion" | "massage";
+          subject: string;
+          title: string;
+          recipient_count?: number;
+          sent_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          type?: "announcement" | "promotion" | "massage";
+          subject?: string;
+          title?: string;
+          recipient_count?: number;
+          sent_by?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };

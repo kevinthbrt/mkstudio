@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { renderMarketingEmailHtml, defaultSubjectForCampaign, type MarketingEmailParams } from "./marketingEmailTemplate";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY ?? "");
@@ -463,6 +464,19 @@ export async function sendWaitlistPromotedEmail({
     from: FROM,
     to,
     subject: `✅ Tu es inscrit(e) — ${sessionName} le ${sessionDate}`,
+    html,
+  });
+}
+
+// ─── Marketing campaign (admin-authored, sent to members) ────────────────────
+export async function sendMarketingEmail(params: MarketingEmailParams & { to: string; subject?: string }) {
+  const { to, subject, ...templateParams } = params;
+  const html = renderMarketingEmailHtml(templateParams);
+
+  return getResend().emails.send({
+    from: FROM,
+    to,
+    subject: subject || defaultSubjectForCampaign(templateParams.type, templateParams.title),
     html,
   });
 }
