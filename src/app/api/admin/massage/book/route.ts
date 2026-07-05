@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
-  const { sessionId, memberId } = await request.json();
-  if (!sessionId || !memberId) {
+  const { sessionId, memberId, productId } = await request.json();
+  if (!sessionId || !memberId || !productId) {
     return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
   }
 
@@ -30,15 +30,23 @@ export async function POST(request: NextRequest) {
 
   const { data: session } = await adminClient
     .from("class_sessions")
-    .select("id, start_time, end_time, coach_name, session_type, is_cancelled, class_types (name), massage_product:products!massage_product_id (name, price)")
+    .select("id, start_time, end_time, coach_name, session_type, is_cancelled")
     .eq("id", sessionId)
     .single();
 
-  const massageProduct = (session as unknown as { massage_product: { name: string; price: number } | null })?.massage_product;
-  const classType = (session as unknown as { class_types: { name: string } })?.class_types;
-
-  if (!session || session.session_type !== "massage" || session.is_cancelled || !massageProduct) {
+  if (!session || session.session_type !== "massage" || session.is_cancelled) {
     return NextResponse.json({ error: "Créneau introuvable" }, { status: 404 });
+  }
+
+  const { data: massageProduct } = await adminClient
+    .from("products")
+    .select("name, price")
+    .eq("id", productId)
+    .eq("is_massage", true)
+    .single();
+
+  if (!massageProduct) {
+    return NextResponse.json({ error: "Type de massage introuvable" }, { status: 400 });
   }
 
   const { data: member } = await adminClient
@@ -54,6 +62,7 @@ export async function POST(request: NextRequest) {
   const { data: result, error } = await adminClient.rpc("book_massage_session", {
     p_member_id: member.id,
     p_session_id: sessionId,
+    p_product_id: productId,
     p_price: price,
     p_discount_applied: eligible,
   });
@@ -65,7 +74,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  const massageName = classType?.name ?? massageProduct.name;
   const sessionDate = formatDate(session.start_time);
   const sessionTime = `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`;
 
@@ -73,7 +81,7 @@ export async function POST(request: NextRequest) {
     sendMassageBookingConfirmationEmail({
       to: member.email,
       firstName: member.first_name ?? "",
-      massageName,
+      massageName: massageProduct.name,
       sessionDate,
       sessionTime,
       coachName: session.coach_name,
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
   if (member.user_id) {
     notifyMember(
       member.user_id,
-      `Massage confirmé — ${massageName}`,
+      `Massage confirmé — ${massageProduct.name}`,
       `${sessionDate} à ${formatTime(session.start_time)}`,
       `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
     );

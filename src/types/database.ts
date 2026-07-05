@@ -252,7 +252,6 @@ export interface Database {
           color: string;
           duration_minutes: number;
           is_massage: boolean;
-          massage_product_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -262,7 +261,6 @@ export interface Database {
           color?: string;
           duration_minutes: number;
           is_massage?: boolean;
-          massage_product_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -271,7 +269,6 @@ export interface Database {
           color?: string;
           duration_minutes?: number;
           is_massage?: boolean;
-          massage_product_id?: string | null;
         };
         Relationships: [];
       };
@@ -290,7 +287,6 @@ export interface Database {
           recurring_rule: string | null;
           session_type: "collective" | "individual" | "duo" | "massage";
           assigned_member_id: string | null;
-          massage_product_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -307,7 +303,6 @@ export interface Database {
           recurring_rule?: string | null;
           session_type?: "collective" | "individual" | "duo" | "massage";
           assigned_member_id?: string | null;
-          massage_product_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -323,7 +318,6 @@ export interface Database {
           recurring_rule?: string | null;
           session_type?: "collective" | "individual" | "duo" | "massage";
           assigned_member_id?: string | null;
-          massage_product_id?: string | null;
         };
         Relationships: [];
       };
@@ -335,6 +329,7 @@ export interface Database {
           status: "confirmed" | "cancelled";
           session_debited: boolean;
           guest_names: string | null;
+          massage_product_id: string | null;
           massage_price: number | null;
           massage_discount_applied: boolean;
           invoice_order_id: string | null;
@@ -348,6 +343,7 @@ export interface Database {
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
           guest_names?: string | null;
+          massage_product_id?: string | null;
           massage_price?: number | null;
           massage_discount_applied?: boolean;
           invoice_order_id?: string | null;
@@ -523,7 +519,7 @@ export interface Database {
         Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
       };
       book_massage_session: {
-        Args: { p_member_id: string; p_session_id: string; p_price: number; p_discount_applied: boolean };
+        Args: { p_member_id: string; p_session_id: string; p_product_id: string; p_price: number; p_discount_applied: boolean };
         Returns: { success: boolean; error?: string };
       };
     };

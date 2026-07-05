@@ -27,13 +27,13 @@ export async function POST(request: NextRequest) {
 
   const { data: booking } = await adminClient
     .from("class_bookings")
-    .select("id, member_id, status, invoice_order_id, class_session_id, class_sessions (massage_product_id, session_type)")
+    .select("id, member_id, status, invoice_order_id, massage_product_id, class_sessions (session_type)")
     .eq("id", bookingId)
     .single();
 
-  const session = (booking as unknown as { class_sessions: { massage_product_id: string | null; session_type: string } })?.class_sessions;
+  const session = (booking as unknown as { class_sessions: { session_type: string } })?.class_sessions;
 
-  if (!booking || session?.session_type !== "massage" || !session.massage_product_id) {
+  if (!booking || session?.session_type !== "massage" || !booking.massage_product_id) {
     return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
   }
   if (booking.status !== "confirmed") {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const { data: product } = await adminClient
     .from("products")
     .select("name, description")
-    .eq("id", session.massage_product_id)
+    .eq("id", booking.massage_product_id)
     .single();
   if (!product) return NextResponse.json({ error: "Type de massage introuvable" }, { status: 404 });
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     .from("orders")
     .insert({
       member_id: member.id,
-      product_id: session.massage_product_id,
+      product_id: booking.massage_product_id,
       amount,
       sessions_purchased: 1,
       invoice_number: invoiceNumber,

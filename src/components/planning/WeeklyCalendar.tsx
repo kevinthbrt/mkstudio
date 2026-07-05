@@ -40,8 +40,6 @@ export interface ClassSessionWithType {
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
   recurring_rule: string | null;
-  massage_product_id: string | null;
-  massage_product?: { name: string; price: number } | null;
   class_types: {
     name: string;
     color: string;
@@ -116,8 +114,11 @@ export function WeeklyCalendar({
   const [loadingAdminWaitlist, setLoadingAdminWaitlist] = useState(false);
   const [massageDiscountEligible, setMassageDiscountEligible] = useState(false);
   const [massageBooking, setMassageBooking] = useState(false);
-  const [massageBookees, setMassageBookees] = useState<{ id: string; memberId: string; name: string; invoiced: boolean; price: number | null; discountApplied: boolean }[]>([]);
+  const [massageBookees, setMassageBookees] = useState<{ id: string; memberId: string; name: string; massageType: string | null; invoiced: boolean; price: number | null; discountApplied: boolean }[]>([]);
   const [loadingMassageBookees, setLoadingMassageBookees] = useState(false);
+  const [massageProducts, setMassageProducts] = useState<{ id: string; name: string; price: number }[]>([]);
+  const [selectedMassageProductId, setSelectedMassageProductId] = useState("");
+  const [adminMassageProductId, setAdminMassageProductId] = useState("");
   const [showInvoiceModal, setShowInvoiceModal] = useState<{ bookingId: string; memberName: string; amount: number } | null>(null);
   const [invoicePaymentMethod, setInvoicePaymentMethod] = useState("especes");
   const [invoiceAmount, setInvoiceAmount] = useState("");
@@ -130,6 +131,17 @@ export function WeeklyCalendar({
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeek]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("products")
+      .select("id, name, price")
+      .eq("is_massage", true)
+      .eq("active", true)
+      .order("price")
+      .then(({ data }) => setMassageProducts(data || []));
+  }, []);
 
   useEffect(() => {
     if (!isAdmin && memberId) {
@@ -149,7 +161,7 @@ export function WeeklyCalendar({
 
     const { data: sessionsData } = await supabase
       .from("class_sessions")
-      .select(`*, class_types (name, color, description), massage_product:products!massage_product_id (name, price)`)
+      .select(`*, class_types (name, color, description)`)
       .gte("start_time", start)
       .lte("start_time", end)
       .eq("is_cancelled", false)
@@ -284,14 +296,14 @@ export function WeeklyCalendar({
   }
 
   async function handleBookMassage(session: ClassSessionWithType) {
-    if (!memberId) return;
+    if (!memberId || !selectedMassageProductId) return;
     setMassageBooking(true);
     setBookingError("");
 
     const res = await fetch("/api/massage/book", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: session.id }),
+      body: JSON.stringify({ sessionId: session.id, productId: selectedMassageProductId }),
     });
     const data = await res.json();
 
@@ -311,6 +323,7 @@ export function WeeklyCalendar({
       prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
     );
     if (data.discountApplied) setMassageDiscountEligible(false);
+    setSelectedMassageProductId("");
     setMassageBooking(false);
   }
 
@@ -345,14 +358,14 @@ export function WeeklyCalendar({
   }
 
   async function handleAdminBookMassageForMember(session: ClassSessionWithType) {
-    if (!adminBookingMemberId) return;
+    if (!adminBookingMemberId || !adminMassageProductId) return;
     setAdminBooking(true);
     setAdminBookingError("");
 
     const res = await fetch("/api/admin/massage/book", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: session.id, memberId: adminBookingMemberId }),
+      body: JSON.stringify({ sessionId: session.id, memberId: adminBookingMemberId, productId: adminMassageProductId }),
     });
     const data = await res.json();
 
@@ -372,6 +385,7 @@ export function WeeklyCalendar({
       prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
     );
     setAdminBookingMemberId("");
+    setAdminMassageProductId("");
     setAdminBooking(false);
   }
 
@@ -959,11 +973,22 @@ export function WeeklyCalendar({
     return null;
   }
 
-  function massagePriceLabel(session: ClassSessionWithType): string {
-    if (!session.massage_product) return "";
-    const price = computeMassagePrice(session.massage_product.price, massageDiscountEligible);
-    const formatted = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(price);
-    return massageDiscountEligible ? `${formatted} (-15%)` : formatted;
+  function formatEuro(amount: number): string {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
+  }
+
+  function massageStartingPriceLabel(): string {
+    if (massageProducts.length === 0) return "Massage";
+    const cheapest = Math.min(...massageProducts.map((p) => p.price));
+    const price = computeMassagePrice(cheapest, massageDiscountEligible);
+    return `Dès ${formatEuro(price)}${massageDiscountEligible ? " (-15%)" : ""}`;
+  }
+
+  function selectedMassagePriceLabel(): string {
+    const product = massageProducts.find((p) => p.id === selectedMassageProductId);
+    if (!product) return "";
+    const price = computeMassagePrice(product.price, massageDiscountEligible);
+    return `${formatEuro(price)}${massageDiscountEligible ? " (-15%)" : ""}`;
   }
 
   if (loading) {
@@ -1137,7 +1162,7 @@ export function WeeklyCalendar({
                         )}
                         {isMassage && (
                           <p className="text-pink-400 text-xs mt-0.5 font-medium">
-                            {massagePriceLabel(session)}
+                            {massageStartingPriceLabel()}
                           </p>
                         )}
                         {/* Booking / waitlist CTA for members - collective sessions only */}
@@ -1291,7 +1316,7 @@ export function WeeklyCalendar({
                         )}
                         {isMassage && !isAdmin && (
                           <p className="text-xs text-pink-400 mt-0.5 truncate">
-                            {massagePriceLabel(session)}
+                            {massageStartingPriceLabel()}
                           </p>
                         )}
                         {isAdmin && !isIndividual && !isMassage && (
@@ -1356,6 +1381,8 @@ export function WeeklyCalendar({
             setWaitlistLoading(false);
             setAdminWaitlist([]);
             setMassageBookees([]);
+            setSelectedMassageProductId("");
+            setAdminMassageProductId("");
           }}
           title={selectedSession.class_types.name}
         >
@@ -1419,14 +1446,6 @@ export function WeeklyCalendar({
                   <p className="text-blue-400 text-sm font-medium flex items-center gap-1">
                     <User size={12} />
                     {selectedSession.assigned_member_name}
-                  </p>
-                </div>
-              )}
-              {selectedSession.session_type === "massage" && !isAdmin && (
-                <div className="bg-pink-500/10 border border-pink-500/20 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Prix</p>
-                  <p className="text-pink-400 text-sm font-medium">
-                    {massagePriceLabel(selectedSession)}
                   </p>
                 </div>
               )}
@@ -1649,13 +1668,29 @@ export function WeeklyCalendar({
                     <p className="text-sm text-gray-500">Ce créneau est déjà réservé</p>
                   </div>
                 ) : (
-                  <Button
-                    className="w-full"
-                    onClick={() => handleBookMassage(selectedSession)}
-                    loading={massageBooking}
-                  >
-                    Réserver ({massagePriceLabel(selectedSession)})
-                  </Button>
+                  <div className="space-y-2">
+                    <select
+                      value={selectedMassageProductId}
+                      onChange={(e) => setSelectedMassageProductId(e.target.value)}
+                      className="w-full bg-[#13121e] border border-[#2d2b40] text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-pink-500/60"
+                    >
+                      <option value="">Choisir un type de massage...</option>
+                      {massageProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {formatEuro(computeMassagePrice(p.price, massageDiscountEligible))}
+                          {massageDiscountEligible ? " (-15%)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      className="w-full"
+                      onClick={() => handleBookMassage(selectedSession)}
+                      loading={massageBooking}
+                      disabled={!selectedMassageProductId}
+                    >
+                      {selectedMassageProductId ? `Réserver (${selectedMassagePriceLabel()})` : "Réserver"}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
@@ -1788,7 +1823,7 @@ export function WeeklyCalendar({
                           {massageBookees.map((b) => (
                             <li key={b.id} className="text-xs text-white flex items-center justify-between gap-2">
                               <div className="flex flex-col">
-                                <span>• {b.name}</span>
+                                <span>• {b.name}{b.massageType ? ` — ${b.massageType}` : ""}</span>
                                 {b.price != null && (
                                   <span className="text-gray-500 pl-3">
                                     {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(b.price)}
@@ -1832,16 +1867,28 @@ export function WeeklyCalendar({
                         {adminBookingError && (
                           <p className="text-xs text-red-400">{adminBookingError}</p>
                         )}
+                        <select
+                          value={adminBookingMemberId}
+                          onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                          className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                        >
+                          <option value="">Choisir un adhérent...</option>
+                          {adminMembers.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.first_name} {m.last_name}
+                            </option>
+                          ))}
+                        </select>
                         <div className="flex gap-2">
                           <select
-                            value={adminBookingMemberId}
-                            onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                            value={adminMassageProductId}
+                            onChange={(e) => setAdminMassageProductId(e.target.value)}
                             className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
                           >
-                            <option value="">Choisir un adhérent...</option>
-                            {adminMembers.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.first_name} {m.last_name}
+                            <option value="">Type de massage...</option>
+                            {massageProducts.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} — {p.price}€
                               </option>
                             ))}
                           </select>
@@ -1849,7 +1896,7 @@ export function WeeklyCalendar({
                             size="sm"
                             onClick={() => handleAdminBookMassageForMember(selectedSession)}
                             loading={adminBooking}
-                            disabled={!adminBookingMemberId}
+                            disabled={!adminBookingMemberId || !adminMassageProductId}
                           >
                             Réserver
                           </Button>

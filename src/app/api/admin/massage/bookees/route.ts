@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("class_bookings")
-    .select("id, member_id, invoice_order_id, massage_price, massage_discount_applied, profiles (first_name, last_name)")
+    .select("id, member_id, invoice_order_id, massage_price, massage_discount_applied, profiles (first_name, last_name), products (name)")
     .eq("class_session_id", sessionId)
     .eq("status", "confirmed");
 
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       id: b.id,
       memberId: b.member_id,
       name: `${b.profiles?.first_name ?? ""} ${b.profiles?.last_name ?? ""}`.trim(),
+      massageType: b.products?.name ?? null,
       invoiced: !!b.invoice_order_id,
       price: b.massage_price,
       discountApplied: b.massage_discount_applied,
