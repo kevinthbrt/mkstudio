@@ -25,7 +25,7 @@ export default function AdminPlanningPage() {
 
   const [sessionForm, setSessionForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual" | "duo",
+    session_type: "collective" as "collective" | "individual" | "duo" | "massage",
     assigned_member_id: "",
     assigned_member_ids: [] as string[],
     coach_name: "Manon",
@@ -42,7 +42,7 @@ export default function AdminPlanningPage() {
 
   const [editForm, setEditForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual" | "duo",
+    session_type: "collective" as "collective" | "individual" | "duo" | "massage",
     assigned_member_id: "",
     coach_name: "",
     date: "",
@@ -110,7 +110,7 @@ export default function AdminPlanningPage() {
     setEditingSession(session);
     setEditForm({
       class_type_id: session.class_type_id,
-      session_type: session.session_type as "collective" | "individual" | "duo",
+      session_type: session.session_type as "collective" | "individual" | "duo" | "massage",
       assigned_member_id: session.assigned_member_id ?? "",
       coach_name: session.coach_name,
       date: dateStr,
@@ -135,6 +135,10 @@ export default function AdminPlanningPage() {
 
     const isIndividual = sessionForm.session_type === "individual";
     const isDuo = sessionForm.session_type === "duo";
+    const isMassage = sessionForm.session_type === "massage";
+    const massageProductId = isMassage
+      ? classTypes.find((t) => t.id === sessionForm.class_type_id)?.massage_product_id ?? null
+      : null;
 
     const sessions = [];
 
@@ -153,10 +157,11 @@ export default function AdminPlanningPage() {
           class_type_id: sessionForm.class_type_id,
           session_type: sessionForm.session_type,
           assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
+          massage_product_id: massageProductId,
           coach_name: sessionForm.coach_name,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
-          max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
+          max_participants: (isIndividual || isMassage) ? 1 : parseInt(sessionForm.max_participants),
           min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
           recurring_rule: recurringRule,
           is_hidden: shouldHide,
@@ -167,10 +172,11 @@ export default function AdminPlanningPage() {
         class_type_id: sessionForm.class_type_id,
         session_type: sessionForm.session_type,
         assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
+        massage_product_id: massageProductId,
         coach_name: sessionForm.coach_name,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
+        max_participants: (isIndividual || isMassage) ? 1 : parseInt(sessionForm.max_participants),
         min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
         recurring_rule: null,
         is_hidden: false,
@@ -276,6 +282,16 @@ export default function AdminPlanningPage() {
             coachName: sessionForm.coach_name,
             recurring: sessionForm.recurring,
           }),
+        }).catch(() => {});
+      }
+    }
+
+    if (isMassage && sessionForm.assigned_member_id && createdSessions) {
+      for (const s of createdSessions) {
+        fetch("/api/admin/massage/book", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: s.id, memberId: sessionForm.assigned_member_id }),
         }).catch(() => {});
       }
     }
@@ -584,7 +600,10 @@ export default function AdminPlanningPage() {
 
   const isIndividual = sessionForm.session_type === "individual";
   const isDuo = sessionForm.session_type === "duo";
+  const isMassage = sessionForm.session_type === "massage";
   const isPrivate = isIndividual || isDuo;
+  const massageClassTypes = classTypes.filter((t) => t.is_massage);
+  const nonMassageClassTypes = classTypes.filter((t) => !t.is_massage);
   const editIsIndividual = editForm.session_type === "individual";
   const editIsDuo = editForm.session_type === "duo";
   const editIsPrivate = editIsIndividual || editIsDuo;
@@ -637,7 +656,7 @@ export default function AdminPlanningPage() {
           {/* Session type */}
           <div>
             <p className="text-sm font-medium text-gray-300 mb-2">Type de séance</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => setSessionForm({ ...sessionForm, session_type: "collective", min_cancel_hours: "3" })}
@@ -671,12 +690,25 @@ export default function AdminPlanningPage() {
               >
                 Duo
               </button>
+              <button
+                type="button"
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "massage", class_type_id: "", assigned_member_ids: [], min_cancel_hours: "24" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  isMassage
+                    ? "bg-pink-500/10 border-pink-500/40 text-pink-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Massage
+              </button>
             </div>
           </div>
 
-          {isIndividual && (
+          {(isIndividual || isMassage) && (
             <div>
-              <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+              <p className="text-sm font-medium text-gray-300 mb-2">
+                {isMassage ? "Adhérent (optionnel — laisser vide pour un créneau ouvert)" : "Adhérent concerné"}
+              </p>
               {sessionForm.assigned_member_id ? (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
@@ -789,14 +821,14 @@ export default function AdminPlanningPage() {
           )}
 
           <Select
-            label="Type de cours"
+            label={isMassage ? "Type de massage" : "Type de cours"}
             value={sessionForm.class_type_id}
             onChange={(e) =>
               setSessionForm({ ...sessionForm, class_type_id: e.target.value })
             }
             options={[
               { value: "", label: "Sélectionner un type..." },
-              ...classTypes.map((t) => ({ value: t.id, label: t.name })),
+              ...(isMassage ? massageClassTypes : nonMassageClassTypes).map((t) => ({ value: t.id, label: t.name })),
             ]}
             required
           />
@@ -839,7 +871,7 @@ export default function AdminPlanningPage() {
             />
           </div>
 
-          {!isIndividual && (
+          {!isIndividual && !isMassage && (
             <div className="grid grid-cols-2 gap-3">
               <Input
                 label="Places max"
@@ -863,7 +895,7 @@ export default function AdminPlanningPage() {
             </div>
           )}
 
-          {isIndividual && (
+          {(isIndividual || isMassage) && (
             <Input
               label="Annulation min (heures)"
               type="number"
@@ -982,6 +1014,16 @@ export default function AdminPlanningPage() {
                     ? " pour 104 séances (récurrence infinie)"
                     : ` pour ${sessionForm.weeks} séances`
                   : ""}.
+              </p>
+            </div>
+          )}
+
+          {isMassage && (
+            <div className="bg-pink-500/10 border border-pink-500/20 rounded-lg p-3">
+              <p className="text-xs text-pink-400">
+                {sessionForm.assigned_member_id
+                  ? "✓ L'adhérent sera automatiquement inscrit (aucun solde débité — le paiement se fait sur place)."
+                  : "Le créneau restera ouvert : n'importe quel adhérent pourra le réserver depuis son planning. Le prix inclut automatiquement la réduction de 15% si l'adhérent y a droit ce mois-ci."}
               </p>
             </div>
           )}

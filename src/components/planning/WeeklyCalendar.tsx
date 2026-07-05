@@ -23,6 +23,7 @@ import {
   formatTime,
   formatDate,
 } from "@/lib/utils";
+import { computeMassagePrice } from "@/lib/massagePricing";
 
 export interface ClassSessionWithType {
   id: string;
@@ -35,10 +36,12 @@ export interface ClassSessionWithType {
   min_cancel_hours: number;
   is_cancelled: boolean;
   is_hidden: boolean;
-  session_type: "collective" | "individual" | "duo";
+  session_type: "collective" | "individual" | "duo" | "massage";
   assigned_member_id: string | null;
   assigned_member_name?: string | null;
   recurring_rule: string | null;
+  massage_product_id: string | null;
+  massage_product?: { name: string; price: number } | null;
   class_types: {
     name: string;
     color: string;
@@ -111,6 +114,15 @@ export function WeeklyCalendar({
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [adminWaitlist, setAdminWaitlist] = useState<{ id: string; position: number; member_id: string; name: string }[]>([]);
   const [loadingAdminWaitlist, setLoadingAdminWaitlist] = useState(false);
+  const [massageDiscountEligible, setMassageDiscountEligible] = useState(false);
+  const [massageBooking, setMassageBooking] = useState(false);
+  const [massageBookees, setMassageBookees] = useState<{ id: string; memberId: string; name: string; invoiced: boolean; price: number | null; discountApplied: boolean }[]>([]);
+  const [loadingMassageBookees, setLoadingMassageBookees] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState<{ bookingId: string; memberName: string; amount: number } | null>(null);
+  const [invoicePaymentMethod, setInvoicePaymentMethod] = useState("especes");
+  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [invoicing, setInvoicing] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
 
   const weekDays = getWeekDays(currentWeek);
 
@@ -118,6 +130,16 @@ export function WeeklyCalendar({
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeek]);
+
+  useEffect(() => {
+    if (!isAdmin && memberId) {
+      fetch("/api/massage/eligibility")
+        .then((r) => r.json())
+        .then((d) => setMassageDiscountEligible(!!d.eligible))
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberId]);
 
   async function loadData() {
     setLoading(true);
@@ -127,7 +149,7 @@ export function WeeklyCalendar({
 
     const { data: sessionsData } = await supabase
       .from("class_sessions")
-      .select(`*, class_types (name, color, description)`)
+      .select(`*, class_types (name, color, description), massage_product:products!massage_product_id (name, price)`)
       .gte("start_time", start)
       .lte("start_time", end)
       .eq("is_cancelled", false)
@@ -201,7 +223,7 @@ export function WeeklyCalendar({
         setSessions(
           rawSessions.filter(
             (s) =>
-              (s.session_type === "collective" && !s.is_hidden) ||
+              ((s.session_type === "collective" || s.session_type === "massage") && !s.is_hidden) ||
               bookingMap[s.id] === "confirmed"
           )
         );
@@ -251,6 +273,142 @@ export function WeeklyCalendar({
       setSessionBookees(Array.isArray(data) ? data : []);
     }
     setLoadingBookees(false);
+  }
+
+  async function loadMassageBookees(sessionId: string) {
+    setLoadingMassageBookees(true);
+    const res = await fetch(`/api/admin/massage/bookees?session_id=${sessionId}`);
+    const data = await res.json();
+    setMassageBookees(Array.isArray(data) ? data : []);
+    setLoadingMassageBookees(false);
+  }
+
+  async function handleBookMassage(session: ClassSessionWithType) {
+    if (!memberId) return;
+    setMassageBooking(true);
+    setBookingError("");
+
+    const res = await fetch("/api/massage/book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setBookingError(data.error || "Une erreur est survenue. Réessayez.");
+      setMassageBooking(false);
+      return;
+    }
+
+    setBookings((b) => ({ ...b, [session.id]: "confirmed" }));
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id ? { ...sess, current_participants: sess.current_participants + 1 } : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
+    );
+    if (data.discountApplied) setMassageDiscountEligible(false);
+    setMassageBooking(false);
+  }
+
+  async function handleCancelMassage(session: ClassSessionWithType) {
+    if (!memberId) return;
+    setMassageBooking(true);
+    setBookingError("");
+
+    const res = await fetch("/api/massage/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setBookingError(data.error || "Une erreur est survenue. Réessayez.");
+      setMassageBooking(false);
+      return;
+    }
+
+    setBookings((b) => ({ ...b, [session.id]: "cancelled" }));
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) } : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - 1) } : null
+    );
+    setMassageBooking(false);
+  }
+
+  async function handleAdminBookMassageForMember(session: ClassSessionWithType) {
+    if (!adminBookingMemberId) return;
+    setAdminBooking(true);
+    setAdminBookingError("");
+
+    const res = await fetch("/api/admin/massage/book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id, memberId: adminBookingMemberId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setAdminBookingError(data.error || "Une erreur est survenue.");
+      setAdminBooking(false);
+      return;
+    }
+
+    await loadMassageBookees(session.id);
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id ? { ...sess, current_participants: sess.current_participants + 1 } : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
+    );
+    setAdminBookingMemberId("");
+    setAdminBooking(false);
+  }
+
+  function openInvoiceModal(bookee: { id: string; name: string; price: number | null }) {
+    setShowInvoiceModal({ bookingId: bookee.id, memberName: bookee.name, amount: bookee.price ?? 0 });
+    setInvoiceAmount(String(bookee.price ?? 0));
+    setInvoicePaymentMethod("especes");
+    setInvoiceError("");
+  }
+
+  async function handleSubmitInvoice() {
+    if (!showInvoiceModal) return;
+    setInvoicing(true);
+    setInvoiceError("");
+
+    const res = await fetch("/api/admin/massage/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: showInvoiceModal.bookingId,
+        paymentMethod: invoicePaymentMethod,
+        amount: parseFloat(invoiceAmount),
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setInvoiceError(data.error || "Une erreur est survenue.");
+      setInvoicing(false);
+      return;
+    }
+
+    setMassageBookees((b) =>
+      b.map((m) => (m.id === showInvoiceModal.bookingId ? { ...m, invoiced: true } : m))
+    );
+    setInvoicing(false);
+    setShowInvoiceModal(null);
   }
 
   async function handleAdminBookForMember(session: ClassSessionWithType) {
@@ -789,14 +947,23 @@ export function WeeklyCalendar({
     const isFull = session.current_participants >= session.max_participants;
     const isIndividual = session.session_type === "individual";
     const isDuo = session.session_type === "duo";
+    const isMassage = session.session_type === "massage";
 
     if (isPast(session)) return <Badge variant="gray">Terminé</Badge>;
     if (isBooked) return <Badge variant="green">Inscrit</Badge>;
     if (onWaitlist) return <Badge variant="orange">#{waitlists[session.id]} liste d&apos;attente</Badge>;
     if (isIndividual) return <Badge variant="blue">Solo</Badge>;
     if (isDuo) return <Badge variant="purple">Duo</Badge>;
+    if (isMassage) return isFull ? <Badge variant="gray">Réservé</Badge> : <Badge variant="gold">Massage</Badge>;
     if (isFull) return <Badge variant="red">Complet</Badge>;
     return null;
+  }
+
+  function massagePriceLabel(session: ClassSessionWithType): string {
+    if (!session.massage_product) return "";
+    const price = computeMassagePrice(session.massage_product.price, massageDiscountEligible);
+    const formatted = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(price);
+    return massageDiscountEligible ? `${formatted} (-15%)` : formatted;
   }
 
   if (loading) {
@@ -885,6 +1052,7 @@ export function WeeklyCalendar({
                 const isFull = session.current_participants >= session.max_participants;
                 const isIndividual = session.session_type === "individual";
                 const isDuo = session.session_type === "duo";
+                const isMassage = session.session_type === "massage";
                 const isHidden = session.is_hidden;
                 const past = isPast(session);
 
@@ -904,17 +1072,24 @@ export function WeeklyCalendar({
                         ? "bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40"
                         : isDuo
                         ? "bg-purple-500/10 border-purple-500/20 hover:border-purple-500/40"
+                        : isMassage
+                        ? "bg-pink-500/10 border-pink-500/20 hover:border-pink-500/40"
                         : "bg-[#111111] border-[#1f1f1f] hover:border-[#D4AF37]/30"
                     }`}
                     onClick={() => {
                       setSelectedSession(session);
                       setBookingError("");
                       setSessionBookees([]);
+                      setMassageBookees([]);
                       setAdminWaitlist([]);
                       if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
                         loadSessionBookees(session.id);
                         refreshSessionParticipants(session.id);
                         if (session.session_type === "collective") loadAdminWaitlist(session.id);
+                      }
+                      if (isAdmin && isMassage) {
+                        loadMassageBookees(session.id);
+                        refreshSessionParticipants(session.id);
                       }
                       if (!isAdmin && session.session_type === "collective") {
                         loadSessionBookees(session.id);
@@ -942,7 +1117,7 @@ export function WeeklyCalendar({
                           {formatTime(session.start_time)} — {formatTime(session.end_time)} •{" "}
                           {session.coach_name}
                         </p>
-                        {!isIndividual && (
+                        {!isIndividual && !isMassage && (
                           <p className={`text-xs mt-0.5 ${isFull ? "text-red-400" : isAdmin ? "text-gray-400 font-medium" : "text-gray-600"}`}>
                             {session.current_participants}/{session.max_participants} inscrits
                             {isFull && " · Complet"}
@@ -958,6 +1133,11 @@ export function WeeklyCalendar({
                         {isDuo && (
                           <p className="text-purple-400 text-xs mt-0.5 font-medium">
                             Coaching duo · {session.current_participants}/{session.max_participants}
+                          </p>
+                        )}
+                        {isMassage && (
+                          <p className="text-pink-400 text-xs mt-0.5 font-medium">
+                            {massagePriceLabel(session)}
                           </p>
                         )}
                         {/* Booking / waitlist CTA for members - collective sessions only */}
@@ -993,6 +1173,18 @@ export function WeeklyCalendar({
                               </button>
                             )}
                           </>
+                        )}
+                        {!isAdmin && memberId && !past && !isBooked && isMassage && !isFull && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSession(session);
+                              setBookingError("");
+                            }}
+                            className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold bg-pink-500/10 text-pink-400 border border-pink-500/25 transition-colors hover:bg-pink-500/20"
+                          >
+                            Réserver mon massage →
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1030,6 +1222,7 @@ export function WeeklyCalendar({
                     const onWaitlist = waitlists[session.id] != null;
                     const isIndividual = session.session_type === "individual";
                     const isDuo = session.session_type === "duo";
+                    const isMassage = session.session_type === "massage";
                     const isHidden = session.is_hidden;
                     const past = isPast(session);
                     const isFull = session.current_participants >= session.max_participants;
@@ -1045,7 +1238,7 @@ export function WeeklyCalendar({
                             : isBooked
                             ? "ring-1 ring-[#D4AF37]/50 hover:opacity-90"
                             : "hover:opacity-90"
-                        } ${isIndividual ? "border border-blue-500/30" : isDuo ? "border border-purple-500/30" : "border border-white/5"}`}
+                        } ${isIndividual ? "border border-blue-500/30" : isDuo ? "border border-purple-500/30" : isMassage ? "border border-pink-500/30" : "border border-white/5"}`}
                         style={{
                           backgroundColor: past
                             ? "#111"
@@ -1059,11 +1252,16 @@ export function WeeklyCalendar({
                           setSelectedSession(session);
                           setBookingError("");
                           setSessionBookees([]);
+                          setMassageBookees([]);
                           setAdminWaitlist([]);
                           if (isAdmin && (session.session_type === "collective" || session.session_type === "duo")) {
                             loadSessionBookees(session.id);
                             refreshSessionParticipants(session.id);
                             if (session.session_type === "collective") loadAdminWaitlist(session.id);
+                          }
+                          if (isAdmin && isMassage) {
+                            loadMassageBookees(session.id);
+                            refreshSessionParticipants(session.id);
                           }
                           if (!isAdmin && session.session_type === "collective") {
                             loadSessionBookees(session.id);
@@ -1091,9 +1289,19 @@ export function WeeklyCalendar({
                               : "Individuel"}
                           </p>
                         )}
-                        {isAdmin && !isIndividual && (
+                        {isMassage && !isAdmin && (
+                          <p className="text-xs text-pink-400 mt-0.5 truncate">
+                            {massagePriceLabel(session)}
+                          </p>
+                        )}
+                        {isAdmin && !isIndividual && !isMassage && (
                           <p className={`text-xs mt-0.5 font-medium ${session.current_participants >= session.max_participants ? "text-red-400" : "text-gray-400"}`}>
                             {session.current_participants}/{session.max_participants}
+                          </p>
+                        )}
+                        {isAdmin && isMassage && (
+                          <p className={`text-xs mt-0.5 font-medium ${isFull ? "text-red-400" : "text-gray-400"}`}>
+                            {isFull ? "Réservé" : "Libre"}
                           </p>
                         )}
                         {!isAdmin && isBooked && (
@@ -1119,6 +1327,11 @@ export function WeeklyCalendar({
                             Attente →
                           </p>
                         )}
+                        {!isAdmin && memberId && !past && !isBooked && isMassage && !isFull && (
+                          <p className="text-xs mt-1 font-semibold text-pink-400">
+                            Réserver →
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -1142,6 +1355,7 @@ export function WeeklyCalendar({
             setAdminBookingError("");
             setWaitlistLoading(false);
             setAdminWaitlist([]);
+            setMassageBookees([]);
           }}
           title={selectedSession.class_types.name}
         >
@@ -1159,6 +1373,8 @@ export function WeeklyCalendar({
                 <Badge variant="gray">Cours collectif</Badge>
               ) : selectedSession.session_type === "duo" ? (
                 <Badge variant="purple">Coaching duo</Badge>
+              ) : selectedSession.session_type === "massage" ? (
+                <Badge variant="gold">Massage</Badge>
               ) : (
                 <Badge variant="blue">Cours individuel</Badge>
               )}
@@ -1203,6 +1419,14 @@ export function WeeklyCalendar({
                   <p className="text-blue-400 text-sm font-medium flex items-center gap-1">
                     <User size={12} />
                     {selectedSession.assigned_member_name}
+                  </p>
+                </div>
+              )}
+              {selectedSession.session_type === "massage" && !isAdmin && (
+                <div className="bg-pink-500/10 border border-pink-500/20 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Prix</p>
+                  <p className="text-pink-400 text-sm font-medium">
+                    {massagePriceLabel(selectedSession)}
                   </p>
                 </div>
               )}
@@ -1402,6 +1626,40 @@ export function WeeklyCalendar({
               </div>
             )}
 
+            {memberId && !isAdmin && !isPast(selectedSession) && selectedSession.session_type === "massage" && (
+              <div className="space-y-2">
+                <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-lg p-3">
+                  <p className="text-xs text-[#D4AF37] font-semibold mb-1">💳 Paiement sur place</p>
+                  <p className="text-xs text-gray-400">
+                    Le règlement se fait directement au moment du massage. Aucune séance de ton solde n&apos;est débitée.
+                  </p>
+                </div>
+
+                {bookings[selectedSession.id] === "confirmed" ? (
+                  <Button
+                    variant="outline"
+                    className="w-full text-red-400 border-red-400/30 hover:bg-red-400/10"
+                    onClick={() => handleCancelMassage(selectedSession)}
+                    loading={massageBooking}
+                  >
+                    Annuler ma réservation
+                  </Button>
+                ) : selectedSession.current_participants >= selectedSession.max_participants ? (
+                  <div className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-3 text-center">
+                    <p className="text-sm text-gray-500">Ce créneau est déjà réservé</p>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => handleBookMassage(selectedSession)}
+                    loading={massageBooking}
+                  >
+                    Réserver ({massagePriceLabel(selectedSession)})
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Admin view */}
             {isAdmin && (
               <div className="space-y-2">
@@ -1514,6 +1772,91 @@ export function WeeklyCalendar({
                       </div>
                     )}
                   </div>
+                ) : selectedSession.session_type === "massage" ? (
+                  <div className="space-y-2">
+                    <div className="bg-pink-500/5 border border-pink-500/20 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-pink-400" />
+                        <p className="text-xs font-medium text-pink-400">
+                          {selectedSession.current_participants}/{selectedSession.max_participants} réservé
+                        </p>
+                      </div>
+                      {loadingMassageBookees ? (
+                        <p className="text-xs text-gray-600">Chargement...</p>
+                      ) : massageBookees.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {massageBookees.map((b) => (
+                            <li key={b.id} className="text-xs text-white flex items-center justify-between gap-2">
+                              <div className="flex flex-col">
+                                <span>• {b.name}</span>
+                                {b.price != null && (
+                                  <span className="text-gray-500 pl-3">
+                                    {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(b.price)}
+                                    {b.discountApplied ? " (-15%)" : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {b.invoiced ? (
+                                  <Badge variant="green">Facturé</Badge>
+                                ) : (
+                                  <button
+                                    onClick={() => openInvoiceModal(b)}
+                                    className="text-[#D4AF37] hover:text-[#e8c84a] text-[10px] font-semibold transition-colors"
+                                  >
+                                    Facturer
+                                  </button>
+                                )}
+                                {!b.invoiced && !isPast(selectedSession) && (
+                                  <button
+                                    onClick={() => handleAdminCancelBookingForMember(selectedSession, b.memberId)}
+                                    disabled={adminBooking}
+                                    className="text-red-400/60 hover:text-red-400 text-[10px] shrink-0 transition-colors disabled:opacity-40"
+                                    title="Désinscrire"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-gray-600 italic">Aucune réservation</p>
+                      )}
+                    </div>
+
+                    {!isPast(selectedSession) && adminMembers.length > 0 && selectedSession.current_participants < selectedSession.max_participants && (
+                      <div className="border rounded-lg p-3 space-y-2 bg-[#1a1a1a] border-[#2a2a2a]">
+                        <p className="text-xs font-medium text-gray-300">Réserver pour un adhérent</p>
+                        {adminBookingError && (
+                          <p className="text-xs text-red-400">{adminBookingError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <select
+                            value={adminBookingMemberId}
+                            onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                            className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                          >
+                            <option value="">Choisir un adhérent...</option>
+                            {adminMembers.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.first_name} {m.last_name}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAdminBookMassageForMember(selectedSession)}
+                            loading={adminBooking}
+                            disabled={!adminBookingMemberId}
+                          >
+                            Réserver
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="bg-[#1a1a1a] rounded-lg p-3 flex items-center gap-2">
                     <Users size={14} className="text-gray-400" />
@@ -1582,6 +1925,52 @@ export function WeeklyCalendar({
           </div>
         </Modal>
       )}
+
+      {/* Massage invoice modal */}
+      <Modal
+        open={!!showInvoiceModal}
+        onClose={() => setShowInvoiceModal(null)}
+        title="Facturer ce massage"
+        size="sm"
+      >
+        {showInvoiceModal && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-300">
+              Adhérent : <span className="text-white font-medium">{showInvoiceModal.memberName}</span>
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Montant (€)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={invoiceAmount}
+                onChange={(e) => setInvoiceAmount(e.target.value)}
+                className="w-full bg-[#13121e] border border-[#2d2b40] text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-[#D4AF37]/60"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Mode de règlement</label>
+              <select
+                value={invoicePaymentMethod}
+                onChange={(e) => setInvoicePaymentMethod(e.target.value)}
+                className="w-full bg-[#13121e] border border-[#2d2b40] text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-[#D4AF37]/60"
+              >
+                <option value="especes">Espèces</option>
+                <option value="carte">Carte bancaire</option>
+                <option value="virement">Virement bancaire</option>
+                <option value="cheque">Chèque</option>
+              </select>
+            </div>
+            {invoiceError && (
+              <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">{invoiceError}</p>
+            )}
+            <Button className="w-full" onClick={handleSubmitInvoice} loading={invoicing}>
+              Générer la facture et envoyer
+            </Button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -446,7 +446,7 @@ function InvoicePDF({
           React.createElement(
             Text,
             { style: { ...styles.tableCell, width: "20%" } },
-            `${Number(order.sessions_purchased)} séance(s)`
+            product.is_massage ? "1 prestation" : `${Number(order.sessions_purchased)} séance(s)`
           ),
           React.createElement(
             Text,

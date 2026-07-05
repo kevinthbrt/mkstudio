@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   const { data: sessions, error: sessionsError } = await adminClient
     .from("class_sessions")
-    .select("id, start_time, end_time, coach_name, class_types (name)")
+    .select("id, start_time, end_time, coach_name, session_type, class_types (name)")
     .gte("start_time", from.toISOString())
     .lte("start_time", to.toISOString())
     .eq("is_cancelled", false);
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
 
   for (const session of sessions) {
     const sessionTyped = session as typeof session & { class_types: { name: string } };
+    const isMassage = session.session_type === "massage";
 
     const { data: bookings } = await adminClient
       .from("class_bookings")
@@ -48,7 +49,9 @@ export async function GET(request: NextRequest) {
       notifyMember(
         profile.user_id,
         `Dans 1h — ${sessionTyped.class_types.name}`,
-        `Ton cours commence à ${formatTime(session.start_time)} avec ${session.coach_name}`,
+        isMassage
+          ? `Ton massage commence à ${formatTime(session.start_time)} — paiement sur place`
+          : `Ton cours commence à ${formatTime(session.start_time)} avec ${session.coach_name}`,
         `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
       );
       sent++;

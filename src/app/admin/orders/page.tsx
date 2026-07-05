@@ -52,7 +52,7 @@ export default function OrdersPage() {
         .select(`*, profiles (first_name, last_name), products (name, session_type)`)
         .order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").eq("role", "member").order("last_name"),
-      supabase.from("products").select("*").eq("active", true).order("name"),
+      supabase.from("products").select("*").eq("active", true).eq("is_massage", false).order("name"),
     ]);
 
     setOrders((ordersRes.data as unknown as OrderWithDetails[]) || []);
