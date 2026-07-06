@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import {
@@ -446,7 +447,7 @@ function InvoicePDF({
           React.createElement(
             Text,
             { style: { ...styles.tableCell, width: "20%" } },
-            `${Number(order.sessions_purchased)} séance(s)`
+            product.is_massage ? "1 prestation" : `${Number(order.sessions_purchased)} séance(s)`
           ),
           React.createElement(
             Text,
@@ -570,26 +571,9 @@ export async function GET(
 ) {
   const { orderId } = await params;
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
-  const { data: userProfile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!userProfile) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
-  const { data: order } = await supabase
+  const { data: order } = await adminClient
     .from("orders")
     .select("*")
     .eq("id", orderId)
@@ -599,19 +583,50 @@ export async function GET(
     return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
   }
 
-  // Members can only access their own invoices
-  if (userProfile.role !== "admin" && order.member_id !== userProfile.id) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  // Guest orders (no member account) are reachable via their unguessable
+  // orderId only — there's no account for them to authenticate with.
+  if (order.member_id) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!userProfile) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    // Members can only access their own invoices
+    if (userProfile.role !== "admin" && order.member_id !== userProfile.id) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+    }
   }
 
-  const [{ data: member }, { data: product }, { data: settings }] =
+  const [{ data: memberProfile }, { data: product }, { data: settings }] =
     await Promise.all([
-      supabase.from("profiles").select("*").eq("id", order.member_id).single(),
-      supabase.from("products").select("*").eq("id", order.product_id).single(),
-      supabase.from("invoice_settings").select("*").single(),
+      order.member_id
+        ? adminClient.from("profiles").select("*").eq("id", order.member_id).single()
+        : Promise.resolve({ data: null }),
+      adminClient.from("products").select("*").eq("id", order.product_id).single(),
+      adminClient.from("invoice_settings").select("*").single(),
     ]);
 
-  if (!member || !product) {
+  const member = memberProfile ?? {
+    first_name: order.guest_name ?? "Client",
+    last_name: "",
+    email: order.guest_email ?? "",
+    phone: null,
+  };
+
+  if (!product) {
     return NextResponse.json({ error: "Données manquantes" }, { status: 500 });
   }
 

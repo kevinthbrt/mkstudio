@@ -25,6 +25,7 @@ export interface Database {
           charter_accepted_at: string | null;
           date_of_birth: string | null;
           is_test_account: boolean;
+          marketing_opt_in: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -43,6 +44,7 @@ export interface Database {
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
           is_test_account?: boolean;
+          marketing_opt_in?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,7 +63,38 @@ export interface Database {
           charter_accepted_at?: string | null;
           date_of_birth?: string | null;
           is_test_account?: boolean;
+          marketing_opt_in?: boolean;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      email_campaigns: {
+        Row: {
+          id: string;
+          type: "announcement" | "promotion" | "massage";
+          subject: string;
+          title: string;
+          recipient_count: number;
+          sent_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: "announcement" | "promotion" | "massage";
+          subject: string;
+          title: string;
+          recipient_count?: number;
+          sent_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          type?: "announcement" | "promotion" | "massage";
+          subject?: string;
+          title?: string;
+          recipient_count?: number;
+          sent_by?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -72,8 +105,9 @@ export interface Database {
           description: string | null;
           price: number;
           session_count: number;
-          session_type: "collective" | "individual" | "duo";
+          session_type: "collective" | "individual" | "duo" | "massage";
           active: boolean;
+          is_massage: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -83,8 +117,9 @@ export interface Database {
           description?: string | null;
           price: number;
           session_count: number;
-          session_type?: "collective" | "individual" | "duo";
+          session_type?: "collective" | "individual" | "duo" | "massage";
           active?: boolean;
+          is_massage?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -94,8 +129,9 @@ export interface Database {
           description?: string | null;
           price?: number;
           session_count?: number;
-          session_type?: "collective" | "individual" | "duo";
+          session_type?: "collective" | "individual" | "duo" | "massage";
           active?: boolean;
+          is_massage?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -103,31 +139,35 @@ export interface Database {
       orders: {
         Row: {
           id: string;
-          member_id: string;
+          member_id: string | null;
           product_id: string;
           amount: number;
           sessions_purchased: number;
           invoice_number: string;
           status: "pending" | "paid" | "cancelled";
           payment_method: string | null;
+          guest_name: string | null;
+          guest_email: string | null;
           created_at: string;
           paid_at: string | null;
         };
         Insert: {
           id?: string;
-          member_id: string;
+          member_id?: string | null;
           product_id: string;
           amount: number;
           sessions_purchased: number;
           invoice_number?: string;
           status?: "pending" | "paid" | "cancelled";
           payment_method?: string | null;
+          guest_name?: string | null;
+          guest_email?: string | null;
           created_at?: string;
           paid_at?: string | null;
         };
         Update: {
           id?: string;
-          member_id?: string;
+          member_id?: string | null;
           product_id?: string;
           amount?: number;
           sessions_purchased?: number;
@@ -215,6 +255,7 @@ export interface Database {
           description: string | null;
           color: string;
           duration_minutes: number;
+          is_massage: boolean;
           created_at: string;
         };
         Insert: {
@@ -223,6 +264,7 @@ export interface Database {
           description?: string | null;
           color?: string;
           duration_minutes: number;
+          is_massage?: boolean;
           created_at?: string;
         };
         Update: {
@@ -230,6 +272,7 @@ export interface Database {
           description?: string | null;
           color?: string;
           duration_minutes?: number;
+          is_massage?: boolean;
         };
         Relationships: [];
       };
@@ -246,7 +289,7 @@ export interface Database {
           is_cancelled: boolean;
           is_hidden: boolean;
           recurring_rule: string | null;
-          session_type: "collective" | "individual" | "duo";
+          session_type: "collective" | "individual" | "duo" | "massage";
           assigned_member_id: string | null;
           created_at: string;
         };
@@ -262,7 +305,7 @@ export interface Database {
           is_cancelled?: boolean;
           is_hidden?: boolean;
           recurring_rule?: string | null;
-          session_type?: "collective" | "individual" | "duo";
+          session_type?: "collective" | "individual" | "duo" | "massage";
           assigned_member_id?: string | null;
           created_at?: string;
         };
@@ -277,7 +320,7 @@ export interface Database {
           is_cancelled?: boolean;
           is_hidden?: boolean;
           recurring_rule?: string | null;
-          session_type?: "collective" | "individual" | "duo";
+          session_type?: "collective" | "individual" | "duo" | "massage";
           assigned_member_id?: string | null;
         };
         Relationships: [];
@@ -285,21 +328,33 @@ export interface Database {
       class_bookings: {
         Row: {
           id: string;
-          member_id: string;
+          member_id: string | null;
           class_session_id: string;
           status: "confirmed" | "cancelled";
           session_debited: boolean;
           guest_names: string | null;
+          massage_product_id: string | null;
+          massage_price: number | null;
+          massage_discount_applied: boolean;
+          invoice_order_id: string | null;
+          guest_name: string | null;
+          guest_email: string | null;
           booked_at: string;
           cancelled_at: string | null;
         };
         Insert: {
           id?: string;
-          member_id: string;
+          member_id?: string | null;
           class_session_id: string;
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
           guest_names?: string | null;
+          massage_product_id?: string | null;
+          massage_price?: number | null;
+          massage_discount_applied?: boolean;
+          invoice_order_id?: string | null;
+          guest_name?: string | null;
+          guest_email?: string | null;
           booked_at?: string;
           cancelled_at?: string | null;
         };
@@ -307,6 +362,9 @@ export interface Database {
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
           guest_names?: string | null;
+          massage_price?: number | null;
+          massage_discount_applied?: boolean;
+          invoice_order_id?: string | null;
           cancelled_at?: string | null;
         };
         Relationships: [];
@@ -467,6 +525,18 @@ export interface Database {
       book_collective_session: {
         Args: { p_member_id: string; p_session_id: string; p_guest_names?: string | null };
         Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
+      };
+      book_massage_session: {
+        Args: {
+          p_session_id: string;
+          p_product_id: string;
+          p_price: number;
+          p_discount_applied: boolean;
+          p_member_id?: string | null;
+          p_guest_name?: string | null;
+          p_guest_email?: string | null;
+        };
+        Returns: { success: boolean; error?: string };
       };
     };
     Enums: {

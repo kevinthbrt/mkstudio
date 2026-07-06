@@ -47,3 +47,53 @@ export function notifyMember(
     }
   })();
 }
+
+/**
+ * Send a push notification to every admin. Call from server-side API routes
+ * when a member self-initiates an action admins should know about (booking,
+ * cancellation). Fire-and-forget (non-blocking).
+ */
+export function notifyAdmins(title: string, message: string, url?: string): void {
+  (async () => {
+    try {
+      const adminClient = createAdminClient();
+      const { data: adminProfiles } = await adminClient
+        .from("profiles")
+        .select("user_id")
+        .eq("role", "admin");
+
+      const adminIds = (adminProfiles ?? []).map((p) => p.user_id);
+      if (adminIds.length === 0) return;
+
+      const { data: subscriptions } = await adminClient
+        .from("push_subscriptions")
+        .select("endpoint, p256dh, auth")
+        .in("user_id", adminIds);
+
+      if (!subscriptions || subscriptions.length === 0) return;
+
+      const results = await Promise.allSettled(
+        subscriptions.map((sub) =>
+          sendPushNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            { title, body: message, url }
+          )
+        )
+      );
+
+      const expired = results
+        .map((r, i) => ({ r, sub: subscriptions[i] }))
+        .filter(({ r }) => r.status === "rejected" && (r.reason as any)?.statusCode === 410)
+        .map(({ sub }) => sub.endpoint);
+
+      if (expired.length > 0) {
+        await adminClient
+          .from("push_subscriptions")
+          .delete()
+          .in("endpoint", expired);
+      }
+    } catch {
+      // Fire-and-forget: never throw
+    }
+  })();
+}

@@ -7,7 +7,7 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { WeeklyCalendar, ClassSessionWithType } from "@/components/planning/WeeklyCalendar";
 import { Plus, Palette, Trash2, AlertTriangle, Eye, EyeOff, Pencil } from "lucide-react";
-import type { ClassType, Profile } from "@/types/database";
+import type { ClassType, Profile, Product } from "@/types/database";
 
 const COLOR_PRESETS = [
   "#D4AF37", "#ef4444", "#3b82f6", "#22c55e",
@@ -17,6 +17,7 @@ const COLOR_PRESETS = [
 export default function AdminPlanningPage() {
   const [classTypes, setClassTypes] = useState<ClassType[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
+  const [massageProducts, setMassageProducts] = useState<Product[]>([]);
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [showManageTypes, setShowManageTypes] = useState(false);
   const [showEditSession, setShowEditSession] = useState(false);
@@ -25,9 +26,10 @@ export default function AdminPlanningPage() {
 
   const [sessionForm, setSessionForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual" | "duo",
+    session_type: "collective" as "collective" | "individual" | "duo" | "massage",
     assigned_member_id: "",
     assigned_member_ids: [] as string[],
+    assigned_massage_product_id: "",
     coach_name: "Manon",
     date: "",
     start_hour: "09:00",
@@ -42,7 +44,7 @@ export default function AdminPlanningPage() {
 
   const [editForm, setEditForm] = useState({
     class_type_id: "",
-    session_type: "collective" as "collective" | "individual" | "duo",
+    session_type: "collective" as "collective" | "individual" | "duo" | "massage",
     assigned_member_id: "",
     coach_name: "",
     date: "",
@@ -82,12 +84,24 @@ export default function AdminPlanningPage() {
   useEffect(() => {
     loadClassTypes();
     loadMembers();
+    loadMassageProducts();
   }, []);
 
   async function loadClassTypes() {
     const supabase = createClient();
     const { data } = await supabase.from("class_types").select("*").order("name");
     setClassTypes(data || []);
+  }
+
+  async function loadMassageProducts() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_massage", true)
+      .eq("active", true)
+      .order("price");
+    setMassageProducts(data || []);
   }
 
   async function loadMembers() {
@@ -110,7 +124,7 @@ export default function AdminPlanningPage() {
     setEditingSession(session);
     setEditForm({
       class_type_id: session.class_type_id,
-      session_type: session.session_type as "collective" | "individual" | "duo",
+      session_type: session.session_type as "collective" | "individual" | "duo" | "massage",
       assigned_member_id: session.assigned_member_id ?? "",
       coach_name: session.coach_name,
       date: dateStr,
@@ -135,6 +149,14 @@ export default function AdminPlanningPage() {
 
     const isIndividual = sessionForm.session_type === "individual";
     const isDuo = sessionForm.session_type === "duo";
+    const isMassage = sessionForm.session_type === "massage";
+    const massageClassTypeId = classTypes.find((t) => t.is_massage)?.id;
+
+    if (isMassage && sessionForm.assigned_member_id && !sessionForm.assigned_massage_product_id) {
+      setCreateError("Choisis le type de massage souhaité par l'adhérent.");
+      setSavingSession(false);
+      return;
+    }
 
     const sessions = [];
 
@@ -150,13 +172,13 @@ export default function AdminPlanningPage() {
         start.setDate(start.getDate() + i * 7);
         end.setDate(end.getDate() + i * 7);
         sessions.push({
-          class_type_id: sessionForm.class_type_id,
+          class_type_id: isMassage ? massageClassTypeId ?? sessionForm.class_type_id : sessionForm.class_type_id,
           session_type: sessionForm.session_type,
           assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
           coach_name: sessionForm.coach_name,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
-          max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
+          max_participants: (isIndividual || isMassage) ? 1 : parseInt(sessionForm.max_participants),
           min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
           recurring_rule: recurringRule,
           is_hidden: shouldHide,
@@ -164,13 +186,13 @@ export default function AdminPlanningPage() {
       }
     } else {
       sessions.push({
-        class_type_id: sessionForm.class_type_id,
+        class_type_id: isMassage ? massageClassTypeId ?? sessionForm.class_type_id : sessionForm.class_type_id,
         session_type: sessionForm.session_type,
         assigned_member_id: isIndividual ? sessionForm.assigned_member_id || null : null,
         coach_name: sessionForm.coach_name,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        max_participants: isIndividual ? 1 : parseInt(sessionForm.max_participants),
+        max_participants: (isIndividual || isMassage) ? 1 : parseInt(sessionForm.max_participants),
         min_cancel_hours: parseInt(sessionForm.min_cancel_hours),
         recurring_rule: null,
         is_hidden: false,
@@ -280,6 +302,20 @@ export default function AdminPlanningPage() {
       }
     }
 
+    if (isMassage && sessionForm.assigned_member_id && createdSessions) {
+      for (const s of createdSessions) {
+        fetch("/api/admin/massage/book", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: s.id,
+            memberId: sessionForm.assigned_member_id,
+            productId: sessionForm.assigned_massage_product_id,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     setSavingSession(false);
     setShowCreateSession(false);
     setDuoMemberSearch("");
@@ -290,6 +326,7 @@ export default function AdminPlanningPage() {
       session_type: "collective",
       assigned_member_id: "",
       assigned_member_ids: [],
+      assigned_massage_product_id: "",
       coach_name: "Manon",
       date: "",
       start_hour: "09:00",
@@ -472,7 +509,7 @@ export default function AdminPlanningPage() {
         .eq("status", "confirmed");
 
       for (const b of confirmedBookings) {
-        if (b.session_debited) {
+        if (b.session_debited && b.member_id) {
           const rpcFn = editingSession.session_type === "individual"
             ? "increment_individual_balance"
             : editingSession.session_type === "duo"
@@ -483,7 +520,7 @@ export default function AdminPlanningPage() {
       }
 
       // Send cancellation emails to all booked members
-      const memberIds = [...new Set(confirmedBookings.map((b) => b.member_id))];
+      const memberIds = [...new Set(confirmedBookings.map((b) => b.member_id).filter((id): id is string => !!id))];
       const sessionName = editingSession.class_types.name;
       const dateObj = new Date(editingSession.start_time);
       const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -584,7 +621,9 @@ export default function AdminPlanningPage() {
 
   const isIndividual = sessionForm.session_type === "individual";
   const isDuo = sessionForm.session_type === "duo";
+  const isMassage = sessionForm.session_type === "massage";
   const isPrivate = isIndividual || isDuo;
+  const nonMassageClassTypes = classTypes.filter((t) => !t.is_massage);
   const editIsIndividual = editForm.session_type === "individual";
   const editIsDuo = editForm.session_type === "duo";
   const editIsPrivate = editIsIndividual || editIsDuo;
@@ -637,10 +676,10 @@ export default function AdminPlanningPage() {
           {/* Session type */}
           <div>
             <p className="text-sm font-medium text-gray-300 mb-2">Type de séance</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "collective", min_cancel_hours: "3" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "collective", assigned_member_id: "", assigned_massage_product_id: "", min_cancel_hours: "3" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   sessionForm.session_type === "collective"
                     ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 text-[#D4AF37]"
@@ -651,7 +690,7 @@ export default function AdminPlanningPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual", assigned_member_ids: [], min_cancel_hours: "24" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "individual", assigned_member_ids: [], assigned_massage_product_id: "", min_cancel_hours: "24" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   isIndividual
                     ? "bg-blue-500/10 border-blue-500/40 text-blue-400"
@@ -662,7 +701,7 @@ export default function AdminPlanningPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setSessionForm({ ...sessionForm, session_type: "duo", assigned_member_id: "", min_cancel_hours: "24" })}
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "duo", assigned_member_id: "", assigned_massage_product_id: "", min_cancel_hours: "24" })}
                 className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
                   isDuo
                     ? "bg-purple-500/10 border-purple-500/40 text-purple-400"
@@ -671,19 +710,32 @@ export default function AdminPlanningPage() {
               >
                 Duo
               </button>
+              <button
+                type="button"
+                onClick={() => setSessionForm({ ...sessionForm, session_type: "massage", class_type_id: "", assigned_member_id: "", assigned_member_ids: [], assigned_massage_product_id: "", min_cancel_hours: "24" })}
+                className={`p-3 rounded-xl border text-sm font-medium transition-colors ${
+                  isMassage
+                    ? "bg-pink-500/10 border-pink-500/40 text-pink-400"
+                    : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]"
+                }`}
+              >
+                Massage
+              </button>
             </div>
           </div>
 
-          {isIndividual && (
+          {(isIndividual || isMassage) && (
             <div>
-              <p className="text-sm font-medium text-gray-300 mb-2">Adhérent concerné</p>
+              <p className="text-sm font-medium text-gray-300 mb-2">
+                {isMassage ? "Adhérent (optionnel — laisser vide pour un créneau ouvert)" : "Adhérent concerné"}
+              </p>
               {sessionForm.assigned_member_id ? (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   <span className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-full px-2.5 py-1">
                     {(() => { const m = members.find((m) => m.id === sessionForm.assigned_member_id); return m ? `${m.first_name} ${m.last_name}` : ""; })()}
                     <button
                       type="button"
-                      onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: "" }); setSoloMemberSearch(""); }}
+                      onClick={() => { setSessionForm({ ...sessionForm, assigned_member_id: "", assigned_massage_product_id: "" }); setSoloMemberSearch(""); }}
                       className="text-blue-400/60 hover:text-blue-300 ml-0.5 leading-none"
                     >×</button>
                   </span>
@@ -718,6 +770,19 @@ export default function AdminPlanningPage() {
                     </div>
                   )}
                 </>
+              )}
+              {isMassage && sessionForm.assigned_member_id && (
+                <Select
+                  label="Type de massage souhaité"
+                  value={sessionForm.assigned_massage_product_id}
+                  onChange={(e) => setSessionForm({ ...sessionForm, assigned_massage_product_id: e.target.value })}
+                  options={[
+                    { value: "", label: "Sélectionner un type..." },
+                    ...massageProducts.map((p) => ({ value: p.id, label: `${p.name} — ${p.price}€` })),
+                  ]}
+                  className="mt-2"
+                  required
+                />
               )}
             </div>
           )}
@@ -788,18 +853,20 @@ export default function AdminPlanningPage() {
             </div>
           )}
 
-          <Select
-            label="Type de cours"
-            value={sessionForm.class_type_id}
-            onChange={(e) =>
-              setSessionForm({ ...sessionForm, class_type_id: e.target.value })
-            }
-            options={[
-              { value: "", label: "Sélectionner un type..." },
-              ...classTypes.map((t) => ({ value: t.id, label: t.name })),
-            ]}
-            required
-          />
+          {!isMassage && (
+            <Select
+              label="Type de cours"
+              value={sessionForm.class_type_id}
+              onChange={(e) =>
+                setSessionForm({ ...sessionForm, class_type_id: e.target.value })
+              }
+              options={[
+                { value: "", label: "Sélectionner un type..." },
+                ...nonMassageClassTypes.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+              required
+            />
+          )}
           <Input
             label="Nom du coach"
             value={sessionForm.coach_name}
@@ -839,7 +906,7 @@ export default function AdminPlanningPage() {
             />
           </div>
 
-          {!isIndividual && (
+          {!isIndividual && !isMassage && (
             <div className="grid grid-cols-2 gap-3">
               <Input
                 label="Places max"
@@ -863,7 +930,7 @@ export default function AdminPlanningPage() {
             </div>
           )}
 
-          {isIndividual && (
+          {(isIndividual || isMassage) && (
             <Input
               label="Annulation min (heures)"
               type="number"
@@ -982,6 +1049,16 @@ export default function AdminPlanningPage() {
                     ? " pour 104 séances (récurrence infinie)"
                     : ` pour ${sessionForm.weeks} séances`
                   : ""}.
+              </p>
+            </div>
+          )}
+
+          {isMassage && (
+            <div className="bg-pink-500/10 border border-pink-500/20 rounded-lg p-3">
+              <p className="text-xs text-pink-400">
+                {sessionForm.assigned_member_id
+                  ? "✓ L'adhérent sera automatiquement inscrit (aucun solde débité — le paiement se fait sur place)."
+                  : "Le créneau restera ouvert : n'importe quel adhérent pourra le réserver depuis son planning. Le prix inclut automatiquement la réduction de 15% si l'adhérent y a droit ce mois-ci."}
               </p>
             </div>
           )}

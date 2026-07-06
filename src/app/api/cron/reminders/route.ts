@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const { data: sessions, error: sessionsError } = await adminClient
     .from("class_sessions")
-    .select("id, start_time, end_time, coach_name, class_types (name)")
+    .select("id, start_time, end_time, coach_name, session_type, class_types (name)")
     .gte("start_time", from.toISOString())
     .lte("start_time", to.toISOString())
     .eq("is_cancelled", false);
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
 
   for (const session of sessions) {
     const sessionTyped = session as typeof session & { class_types: { name: string } };
+    const isMassage = session.session_type === "massage";
 
     // Get all confirmed bookings for this session with member profiles
     const { data: bookings } = await adminClient
@@ -55,6 +56,9 @@ export async function GET(request: NextRequest) {
           sessionDate: formatDate(session.start_time),
           sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
           coachName: session.coach_name,
+          note: isMassage
+            ? "Pense à prévoir le règlement sur place, au moment du massage."
+            : undefined,
         });
         sent++;
       } catch (err) {
@@ -66,7 +70,9 @@ export async function GET(request: NextRequest) {
         notifyMember(
           profile.user_id,
           `Rappel — ${sessionTyped.class_types.name} demain`,
-          `Ton cours est demain à ${formatTime(session.start_time)} avec ${session.coach_name}`,
+          isMassage
+            ? `Ton massage est demain à ${formatTime(session.start_time)} — paiement sur place`
+            : `Ton cours est demain à ${formatTime(session.start_time)} avec ${session.coach_name}`,
           `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
         );
       }

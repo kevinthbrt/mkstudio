@@ -1,8 +1,22 @@
 import { Resend } from "resend";
+import { renderMarketingEmailHtml, defaultSubjectForCampaign, type MarketingEmailParams } from "./marketingEmailTemplate";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY ?? "");
 }
+
+// The Resend SDK never throws on API-level failures (unverified domain, rate
+// limit, invalid recipient, etc.) — it resolves with { data: null, error }.
+// A bare `.catch()` around `.send()` never sees those, so route through here
+// to make sure they're actually logged instead of silently vanishing.
+async function sendEmail(payload: Parameters<Resend["emails"]["send"]>[0]) {
+  const result = await getResend().emails.send(payload);
+  if (result.error) {
+    console.error("[email] Resend error:", result.error, "| to:", payload.to, "| subject:", payload.subject);
+  }
+  return result;
+}
+
 const FROM = process.env.RESEND_FROM_EMAIL ?? "MK Studio <noreply@mkstudio-training.fr>";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mkstudio-training.fr";
 
@@ -83,7 +97,7 @@ export async function sendWelcomeEmail(to: string, firstName: string) {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: "Bienvenue chez MK Studio 🏋️",
@@ -137,7 +151,7 @@ export async function sendBookingConfirmationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Inscription confirmée — ${sessionName}`,
@@ -179,7 +193,7 @@ export async function sendCancellationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Annulation — ${sessionName}`,
@@ -194,30 +208,33 @@ export async function sendPurchaseConfirmationEmail(params: {
   productName: string;
   amount: number;
   sessionCount: number;
-  sessionType: "collective" | "individual" | "duo";
+  sessionType: "collective" | "individual" | "duo" | "massage";
   invoiceNumber: string;
   orderId: string;
 }) {
   const { to, firstName, productName, amount, sessionCount, sessionType, invoiceNumber, orderId } = params;
+  const isMassage = sessionType === "massage";
   const balanceLabel = sessionType === "individual" ? "individuel" : sessionType === "duo" ? "duo" : "collectif";
   const formattedAmount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
 
   const html = layout(`
     <div style="display:inline-block;background:#D4AF3722;border:1px solid #D4AF3744;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
-      <span style="color:#D4AF37;font-size:13px;font-weight:600;">Achat confirmé</span>
+      <span style="color:#D4AF37;font-size:13px;font-weight:600;">${isMassage ? "Facture" : "Achat confirmé"}</span>
     </div>
     <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${productName}</h1>
-    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ton achat a bien été enregistré.</p>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ${isMassage ? "voici la facture de ton massage." : "ton achat a bien été enregistré."}</p>
     ${divider()}
     <table width="100%" cellpadding="0" cellspacing="0">
       ${infoRow("Produit", productName)}
       ${infoRow("Montant", formattedAmount)}
-      ${infoRow("Séances créditées", `${sessionCount} séance${sessionCount > 1 ? "s" : ""} (solde ${balanceLabel})`)}
+      ${isMassage ? "" : infoRow("Séances créditées", `${sessionCount} séance${sessionCount > 1 ? "s" : ""} (solde ${balanceLabel})`)}
       ${infoRow("N° facture", invoiceNumber)}
     </table>
     ${divider()}
     <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 24px;">
-      Tes séances ont été ajoutées à ton solde ${balanceLabel}. Tu peux maintenant réserver tes cours.
+      ${isMassage
+        ? "Merci pour ta confiance, à bientôt pour ton prochain massage !"
+        : `Tes séances ont été ajoutées à ton solde ${balanceLabel}. Tu peux maintenant réserver tes cours.`}
     </p>
     <div style="text-align:center;margin-bottom:16px;">
       ${btn("Télécharger ma facture", `${SITE_URL}/api/invoices/${orderId}`)}
@@ -227,7 +244,7 @@ export async function sendPurchaseConfirmationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Confirmation d'achat — ${productName} (${invoiceNumber})`,
@@ -276,7 +293,7 @@ export async function sendIndividualSessionBookingEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `${subjectLabel} — ${sessionName}`,
@@ -291,17 +308,18 @@ export async function sendSessionCancelledByAdminEmail(params: {
   sessionName: string;
   sessionDate: string;
   sessionTime: string;
-  sessionType: "collective" | "individual" | "duo";
+  sessionType: "collective" | "individual" | "duo" | "massage";
 }) {
   const { to, firstName, sessionName, sessionDate, sessionTime, sessionType } = params;
   const balanceLabel = sessionType === "individual" ? "individuel" : sessionType === "duo" ? "duo" : "collectif";
+  const isMassage = sessionType === "massage";
 
   const html = layout(`
     <div style="display:inline-block;background:#f9731633;border:1px solid #f9731644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
-      <span style="color:#fb923c;font-size:13px;font-weight:600;">Cours annulé</span>
+      <span style="color:#fb923c;font-size:13px;font-weight:600;">${isMassage ? "Massage annulé" : "Cours annulé"}</span>
     </div>
     <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${sessionName}</h1>
-    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ce cours a été annulé par le coach.</p>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ${isMassage ? "ce massage a été annulé par ta coach." : "ce cours a été annulé par le coach."}</p>
     ${divider()}
     <table width="100%" cellpadding="0" cellspacing="0">
       ${infoRow("Date", sessionDate)}
@@ -309,17 +327,17 @@ export async function sendSessionCancelledByAdminEmail(params: {
     </table>
     ${divider()}
     <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 20px;">
-      Ta séance a été automatiquement remboursée sur ton solde ${balanceLabel}.
+      ${isMassage ? "Aucun paiement n'était dû, tu n'as rien à faire." : `Ta séance a été automatiquement remboursée sur ton solde ${balanceLabel}.`}
     </p>
     <div style="text-align:center;">
       ${btn("Voir le planning", `${SITE_URL}/dashboard/planning`)}
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
-    subject: `Cours annulé — ${sessionName}`,
+    subject: `${isMassage ? "Massage annulé" : "Cours annulé"} — ${sessionName}`,
     html,
   });
 }
@@ -332,8 +350,9 @@ export async function sendSessionReminderEmail(params: {
   sessionDate: string;
   sessionTime: string;
   coachName: string;
+  note?: string;
 }) {
-  const { to, firstName, sessionName, sessionDate, sessionTime, coachName } = params;
+  const { to, firstName, sessionName, sessionDate, sessionTime, coachName, note } = params;
 
   const html = layout(`
     <div style="display:inline-block;background:#7c3aed22;border:1px solid #7c3aed44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
@@ -349,17 +368,68 @@ export async function sendSessionReminderEmail(params: {
     </table>
     ${divider()}
     <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 20px;">
-      Pense à préparer ta tenue et à arriver quelques minutes en avance. À demain !
+      ${note ? note : "Pense à préparer ta tenue et à arriver quelques minutes en avance. À demain !"}
     </p>
     <div style="text-align:center;">
       ${btn("Voir mon planning", `${SITE_URL}/dashboard`)}
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Rappel — ${sessionName} demain à ${sessionTime}`,
+    html,
+  });
+}
+
+// ─── Massage booking confirmation ──────────────────────────────────────────────
+export async function sendMassageBookingConfirmationEmail(params: {
+  to: string;
+  firstName: string;
+  massageName: string;
+  sessionDate: string;
+  sessionTime: string;
+  coachName: string;
+  price: number;
+  basePrice: number;
+  discountApplied: boolean;
+}) {
+  const { to, firstName, massageName, sessionDate, sessionTime, coachName, price, basePrice, discountApplied } = params;
+  const formatEuro = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+  const priceHtml = discountApplied
+    ? `<span style="text-decoration:line-through;color:#6b7280;margin-right:6px;">${formatEuro(basePrice)}</span><span style="color:#D4AF37;font-weight:700;">${formatEuro(price)}</span> <span style="color:#D4AF37;font-size:11px;">-15%</span>`
+    : formatEuro(price);
+
+  const html = layout(`
+    <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#4ade80;font-size:13px;font-weight:600;">✓ Massage réservé</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${massageName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ta réservation est confirmée.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+      ${infoRow("Avec", coachName)}
+      ${infoRow("Prix", priceHtml)}
+    </table>
+    ${divider()}
+    <div style="background:#D4AF3711;border:1px solid #D4AF3733;border-radius:10px;padding:14px;margin-bottom:8px;">
+      <p style="color:#D4AF37;font-size:13px;font-weight:600;margin:0 0 6px;">💳 Paiement</p>
+      <p style="color:#d1d5db;font-size:13px;line-height:1.6;margin:0;">
+        Le règlement se fait directement sur place, au moment du massage.
+      </p>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+      ${btn("Voir mon planning", `${SITE_URL}/dashboard`)}
+    </div>
+  `);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: `✓ Massage confirmé — ${massageName} le ${sessionDate}`,
     html,
   });
 }
@@ -409,7 +479,7 @@ export async function sendWaitlistConfirmationEmail({
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Liste d'attente — ${sessionName} le ${sessionDate}`,
@@ -459,10 +529,61 @@ export async function sendWaitlistPromotedEmail({
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `✅ Tu es inscrit(e) — ${sessionName} le ${sessionDate}`,
+    html,
+  });
+}
+
+// ─── Massage cancelled by member ───────────────────────────────────────────────
+export async function sendMassageCancellationEmail(params: {
+  to: string;
+  firstName: string;
+  massageName: string;
+  sessionDate: string;
+  sessionTime: string;
+}) {
+  const { to, firstName, massageName, sessionDate, sessionTime } = params;
+
+  const html = layout(`
+    <div style="display:inline-block;background:#f9731633;border:1px solid #f9731644;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#fb923c;font-size:13px;font-weight:600;">Massage annulé</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${massageName}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${firstName}, ton annulation a bien été prise en compte.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${infoRow("Date", sessionDate)}
+      ${infoRow("Horaire", sessionTime)}
+    </table>
+    ${divider()}
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 20px;">
+      Aucun paiement n'était dû, tu n'as rien à faire. Tu peux réserver un autre créneau depuis ton espace.
+    </p>
+    <div style="text-align:center;">
+      ${btn("Voir le planning", `${SITE_URL}/dashboard/planning`)}
+    </div>
+  `);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: `Massage annulé — ${massageName}`,
+    html,
+  });
+}
+
+// ─── Marketing campaign (admin-authored, sent to members) ────────────────────
+export async function sendMarketingEmail(params: MarketingEmailParams & { to: string; subject?: string }) {
+  const { to, subject, ...templateParams } = params;
+  const html = renderMarketingEmailHtml(templateParams);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: subject || defaultSubjectForCampaign(templateParams.type, templateParams.title),
     html,
   });
 }

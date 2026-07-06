@@ -24,7 +24,7 @@ export default function ProductsPage() {
     description: "",
     price: "",
     session_count: "",
-    session_type: "collective" as "collective" | "individual" | "duo",
+    session_type: "collective" as "collective" | "individual" | "duo" | "massage",
     active: true,
   });
 
@@ -44,7 +44,7 @@ export default function ProductsPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: "", description: "", price: "", session_count: "", session_type: "collective" as "collective" | "individual" | "duo", active: true });
+    setForm({ name: "", description: "", price: "", session_count: "", session_type: "collective" as "collective" | "individual" | "duo" | "massage", active: true });
     setShowModal(true);
   }
 
@@ -247,7 +247,7 @@ export default function ProductsPage() {
 
           <div>
             <p className="text-sm font-medium text-gray-300 mb-2">Type de séances</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid gap-2 ${editing?.is_massage ? "grid-cols-4" : "grid-cols-3"}`}>
               <button
                 type="button"
                 onClick={() => setForm({ ...form, session_type: "collective" })}
@@ -281,6 +281,15 @@ export default function ProductsPage() {
               >
                 Duo
               </button>
+              {editing?.is_massage && (
+                <button
+                  type="button"
+                  disabled
+                  className="p-3 rounded-xl border text-sm font-medium bg-pink-500/10 border-pink-500/40 text-pink-400 cursor-default"
+                >
+                  Massage
+                </button>
+              )}
             </div>
           </div>
 
