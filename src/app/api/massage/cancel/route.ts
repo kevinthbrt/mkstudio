@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMassageCancellationEmail } from "@/lib/email";
+import { notifyAdmins } from "@/lib/notifyMember";
 import { formatDate, formatTime } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -70,6 +71,12 @@ export async function POST(request: NextRequest) {
       sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
     }).catch(() => {});
   }
+
+  notifyAdmins(
+    "Annulation massage",
+    `${profile.first_name} a annulé — ${massageName} le ${formatDate(session.start_time)} à ${formatTime(session.start_time)}`,
+    "/admin/planning"
+  );
 
   return NextResponse.json({ success: true });
 }

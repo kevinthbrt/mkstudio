@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMassageBookingConfirmationEmail } from "@/lib/email";
-import { notifyMember } from "@/lib/notifyMember";
+import { notifyMember, notifyAdmins } from "@/lib/notifyMember";
 import { isEligibleForMassageDiscount } from "@/lib/massageEligibility";
 import { computeMassagePrice } from "@/lib/massagePricing";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -88,6 +88,12 @@ export async function POST(request: NextRequest) {
     `Massage confirmé — ${massageProduct.name}`,
     `${sessionDate} à ${formatTime(session.start_time)}`,
     `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/dashboard`
+  );
+
+  notifyAdmins(
+    "Nouvelle réservation massage 💆",
+    `${profile.first_name} a réservé — ${massageProduct.name} le ${sessionDate} à ${formatTime(session.start_time)}`,
+    "/admin/planning"
   );
 
   return NextResponse.json({ success: true, price, discountApplied: eligible });
