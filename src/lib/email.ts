@@ -4,6 +4,19 @@ import { renderMarketingEmailHtml, defaultSubjectForCampaign, type MarketingEmai
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY ?? "");
 }
+
+// The Resend SDK never throws on API-level failures (unverified domain, rate
+// limit, invalid recipient, etc.) — it resolves with { data: null, error }.
+// A bare `.catch()` around `.send()` never sees those, so route through here
+// to make sure they're actually logged instead of silently vanishing.
+async function sendEmail(payload: Parameters<Resend["emails"]["send"]>[0]) {
+  const result = await getResend().emails.send(payload);
+  if (result.error) {
+    console.error("[email] Resend error:", result.error, "| to:", payload.to, "| subject:", payload.subject);
+  }
+  return result;
+}
+
 const FROM = process.env.RESEND_FROM_EMAIL ?? "MK Studio <noreply@mkstudio-training.fr>";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mkstudio-training.fr";
 
@@ -84,7 +97,7 @@ export async function sendWelcomeEmail(to: string, firstName: string) {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: "Bienvenue chez MK Studio 🏋️",
@@ -138,7 +151,7 @@ export async function sendBookingConfirmationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Inscription confirmée — ${sessionName}`,
@@ -180,7 +193,7 @@ export async function sendCancellationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Annulation — ${sessionName}`,
@@ -231,7 +244,7 @@ export async function sendPurchaseConfirmationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Confirmation d'achat — ${productName} (${invoiceNumber})`,
@@ -280,7 +293,7 @@ export async function sendIndividualSessionBookingEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `${subjectLabel} — ${sessionName}`,
@@ -321,7 +334,7 @@ export async function sendSessionCancelledByAdminEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `${isMassage ? "Massage annulé" : "Cours annulé"} — ${sessionName}`,
@@ -362,7 +375,7 @@ export async function sendSessionReminderEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Rappel — ${sessionName} demain à ${sessionTime}`,
@@ -413,7 +426,7 @@ export async function sendMassageBookingConfirmationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `✓ Massage confirmé — ${massageName} le ${sessionDate}`,
@@ -466,7 +479,7 @@ export async function sendWaitlistConfirmationEmail({
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Liste d'attente — ${sessionName} le ${sessionDate}`,
@@ -516,7 +529,7 @@ export async function sendWaitlistPromotedEmail({
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `✅ Tu es inscrit(e) — ${sessionName} le ${sessionDate}`,
@@ -554,7 +567,7 @@ export async function sendMassageCancellationEmail(params: {
     </div>
   `);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: `Massage annulé — ${massageName}`,
@@ -567,7 +580,7 @@ export async function sendMarketingEmail(params: MarketingEmailParams & { to: st
   const { to, subject, ...templateParams } = params;
   const html = renderMarketingEmailHtml(templateParams);
 
-  return getResend().emails.send({
+  return sendEmail({
     from: FROM,
     to,
     subject: subject || defaultSubjectForCampaign(templateParams.type, templateParams.title),

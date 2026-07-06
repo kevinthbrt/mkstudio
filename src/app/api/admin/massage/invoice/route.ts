@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       sessionType: "massage",
       invoiceNumber,
       orderId: order.id,
-    }).catch(() => {});
+    }).catch((err) => console.error("[admin/massage/invoice] email error:", err));
   }
 
   if (member?.user_id) {

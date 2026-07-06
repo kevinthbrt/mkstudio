@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       price,
       basePrice: massageProduct.price,
       discountApplied: eligible,
-    }).catch(() => {});
+    }).catch((err) => console.error("[admin/massage/book] email error:", err));
   }
 
   if (member?.user_id) {

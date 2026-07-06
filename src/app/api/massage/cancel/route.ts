@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       massageName,
       sessionDate: formatDate(session.start_time),
       sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
-    }).catch(() => {});
+    }).catch((err) => console.error("[massage/cancel] email error:", err));
   }
 
   notifyAdmins(

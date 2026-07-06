@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       massageName: product?.name ?? "Massage",
       sessionDate: formatDate(session.start_time),
       sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
-    }).catch(() => {});
+    }).catch((err) => console.error("[admin/massage/cancel-booking] email error:", err));
   }
 
   return NextResponse.json({ success: true });
