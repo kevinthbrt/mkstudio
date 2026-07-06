@@ -18,7 +18,8 @@ interface OrderWithDetails {
   status: string;
   payment_method: string | null;
   created_at: string;
-  profiles: { first_name: string; last_name: string };
+  guest_name: string | null;
+  profiles: { first_name: string; last_name: string } | null;
   products: { name: string; session_type: string };
 }
 
@@ -153,7 +154,9 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium text-sm">
-                    {order.profiles?.first_name} {order.profiles?.last_name}
+                    {order.profiles
+                      ? `${order.profiles.first_name} ${order.profiles.last_name}`
+                      : `${order.guest_name ?? "Client"} (invité)`}
                   </p>
                   <p className="text-gray-500 text-xs mt-0.5">
                     {order.products?.name} — {order.sessions_purchased} séance(s)

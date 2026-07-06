@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
-  const { sessionId, memberId, productId } = await request.json();
-  if (!sessionId || !memberId || !productId) {
+  const { sessionId, memberId, guestName, guestEmail, productId } = await request.json();
+  if (!sessionId || !productId || (!memberId && !guestName)) {
     return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
   }
 
@@ -49,22 +49,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Type de massage introuvable" }, { status: 400 });
   }
 
-  const { data: member } = await adminClient
-    .from("profiles")
-    .select("id, first_name, email, user_id")
-    .eq("id", memberId)
-    .single();
-  if (!member) return NextResponse.json({ error: "Adhérent introuvable" }, { status: 404 });
+  let member: { id: string; first_name: string; email: string; user_id: string } | null = null;
+  if (memberId) {
+    const { data } = await adminClient
+      .from("profiles")
+      .select("id, first_name, email, user_id")
+      .eq("id", memberId)
+      .single();
+    if (!data) return NextResponse.json({ error: "Adhérent introuvable" }, { status: 404 });
+    member = data;
+  }
 
-  const eligible = await isEligibleForMassageDiscount(adminClient, member.id);
+  const eligible = member ? await isEligibleForMassageDiscount(adminClient, member.id) : false;
   const price = computeMassagePrice(massageProduct.price, eligible);
 
   const { data: result, error } = await adminClient.rpc("book_massage_session", {
-    p_member_id: member.id,
     p_session_id: sessionId,
     p_product_id: productId,
     p_price: price,
     p_discount_applied: eligible,
+    p_member_id: member?.id ?? null,
+    p_guest_name: member ? null : guestName,
+    p_guest_email: member ? null : guestEmail || null,
   });
 
   const rpcResult = result as { success: boolean; error?: string } | null;
@@ -76,11 +82,13 @@ export async function POST(request: NextRequest) {
 
   const sessionDate = formatDate(session.start_time);
   const sessionTime = `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`;
+  const recipientEmail = member?.email ?? guestEmail;
+  const recipientFirstName = member?.first_name ?? guestName ?? "";
 
-  if (member.email) {
+  if (recipientEmail) {
     sendMassageBookingConfirmationEmail({
-      to: member.email,
-      firstName: member.first_name ?? "",
+      to: recipientEmail,
+      firstName: recipientFirstName,
       massageName: massageProduct.name,
       sessionDate,
       sessionTime,
@@ -90,7 +98,7 @@ export async function POST(request: NextRequest) {
     }).catch(() => {});
   }
 
-  if (member.user_id) {
+  if (member?.user_id) {
     notifyMember(
       member.user_id,
       `Massage confirmé — ${massageProduct.name}`,

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
   const { data: booking } = await adminClient
     .from("class_bookings")
-    .select("id, member_id, status, invoice_order_id, massage_product_id, class_sessions (session_type)")
+    .select("id, member_id, guest_name, guest_email, status, invoice_order_id, massage_product_id, class_sessions (session_type)")
     .eq("id", bookingId)
     .single();
 
@@ -43,12 +43,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ce massage a déjà été facturé" }, { status: 400 });
   }
 
-  const { data: member } = await adminClient
-    .from("profiles")
-    .select("id, first_name, email, user_id")
-    .eq("id", booking.member_id)
-    .single();
-  if (!member) return NextResponse.json({ error: "Adhérent introuvable" }, { status: 404 });
+  let member: { id: string; first_name: string; email: string; user_id: string } | null = null;
+  if (booking.member_id) {
+    const { data } = await adminClient
+      .from("profiles")
+      .select("id, first_name, email, user_id")
+      .eq("id", booking.member_id)
+      .single();
+    if (!data) return NextResponse.json({ error: "Adhérent introuvable" }, { status: 404 });
+    member = data;
+  }
 
   const { data: product } = await adminClient
     .from("products")
@@ -65,7 +69,9 @@ export async function POST(request: NextRequest) {
   const { data: order, error: orderError } = await adminClient
     .from("orders")
     .insert({
-      member_id: member.id,
+      member_id: member?.id ?? null,
+      guest_name: member ? null : booking.guest_name,
+      guest_email: member ? null : booking.guest_email,
       product_id: booking.massage_product_id,
       amount,
       sessions_purchased: 1,
@@ -93,10 +99,13 @@ export async function POST(request: NextRequest) {
     .update({ invoice_order_id: order.id })
     .eq("id", bookingId);
 
-  if (member.email) {
+  const recipientEmail = member?.email ?? booking.guest_email;
+  const recipientFirstName = member?.first_name ?? booking.guest_name ?? "";
+
+  if (recipientEmail) {
     sendPurchaseConfirmationEmail({
-      to: member.email,
-      firstName: member.first_name ?? "",
+      to: recipientEmail,
+      firstName: recipientFirstName,
       productName: product.name,
       amount,
       sessionCount: 1,
@@ -106,7 +115,7 @@ export async function POST(request: NextRequest) {
     }).catch(() => {});
   }
 
-  if (member.user_id) {
+  if (member?.user_id) {
     notifyMember(
       member.user_id,
       "Facture disponible",

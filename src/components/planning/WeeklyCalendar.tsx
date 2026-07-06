@@ -114,11 +114,15 @@ export function WeeklyCalendar({
   const [loadingAdminWaitlist, setLoadingAdminWaitlist] = useState(false);
   const [massageDiscountEligible, setMassageDiscountEligible] = useState(false);
   const [massageBooking, setMassageBooking] = useState(false);
-  const [massageBookees, setMassageBookees] = useState<{ id: string; memberId: string; name: string; massageType: string | null; invoiced: boolean; price: number | null; discountApplied: boolean }[]>([]);
+  const [massageBookees, setMassageBookees] = useState<{ id: string; memberId: string | null; name: string; isGuest: boolean; massageType: string | null; invoiced: boolean; price: number | null; discountApplied: boolean }[]>([]);
   const [loadingMassageBookees, setLoadingMassageBookees] = useState(false);
   const [massageProducts, setMassageProducts] = useState<{ id: string; name: string; price: number }[]>([]);
   const [selectedMassageProductId, setSelectedMassageProductId] = useState("");
   const [adminMassageProductId, setAdminMassageProductId] = useState("");
+  const [massageGuestMode, setMassageGuestMode] = useState(false);
+  const [massageGuestName, setMassageGuestName] = useState("");
+  const [massageGuestEmail, setMassageGuestEmail] = useState("");
+  const [cancellingMassageBookingId, setCancellingMassageBookingId] = useState("");
   const [showInvoiceModal, setShowInvoiceModal] = useState<{ bookingId: string; memberName: string; amount: number } | null>(null);
   const [invoicePaymentMethod, setInvoicePaymentMethod] = useState("especes");
   const [invoiceAmount, setInvoiceAmount] = useState("");
@@ -358,14 +362,19 @@ export function WeeklyCalendar({
   }
 
   async function handleAdminBookMassageForMember(session: ClassSessionWithType) {
-    if (!adminBookingMemberId || !adminMassageProductId) return;
+    if (!adminMassageProductId) return;
+    if (massageGuestMode ? !massageGuestName.trim() : !adminBookingMemberId) return;
     setAdminBooking(true);
     setAdminBookingError("");
 
     const res = await fetch("/api/admin/massage/book", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: session.id, memberId: adminBookingMemberId, productId: adminMassageProductId }),
+      body: JSON.stringify(
+        massageGuestMode
+          ? { sessionId: session.id, guestName: massageGuestName.trim(), guestEmail: massageGuestEmail.trim() || undefined, productId: adminMassageProductId }
+          : { sessionId: session.id, memberId: adminBookingMemberId, productId: adminMassageProductId }
+      ),
     });
     const data = await res.json();
 
@@ -386,7 +395,31 @@ export function WeeklyCalendar({
     );
     setAdminBookingMemberId("");
     setAdminMassageProductId("");
+    setMassageGuestName("");
+    setMassageGuestEmail("");
     setAdminBooking(false);
+  }
+
+  async function handleCancelMassageBookingById(session: ClassSessionWithType, bookingId: string) {
+    setCancellingMassageBookingId(bookingId);
+    const res = await fetch("/api/admin/massage/cancel-booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId }),
+    });
+
+    if (res.ok) {
+      await loadMassageBookees(session.id);
+      setSessions((s) =>
+        s.map((sess) =>
+          sess.id === session.id ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) } : sess
+        )
+      );
+      setSelectedSession((prev) =>
+        prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - 1) } : null
+      );
+    }
+    setCancellingMassageBookingId("");
   }
 
   function openInvoiceModal(bookee: { id: string; name: string; price: number | null }) {
@@ -1383,6 +1416,9 @@ export function WeeklyCalendar({
             setMassageBookees([]);
             setSelectedMassageProductId("");
             setAdminMassageProductId("");
+            setMassageGuestMode(false);
+            setMassageGuestName("");
+            setMassageGuestEmail("");
           }}
           title={selectedSession.class_types.name}
         >
@@ -1823,7 +1859,11 @@ export function WeeklyCalendar({
                           {massageBookees.map((b) => (
                             <li key={b.id} className="text-xs text-white flex items-center justify-between gap-2">
                               <div className="flex flex-col">
-                                <span>• {b.name}{b.massageType ? ` — ${b.massageType}` : ""}</span>
+                                <span>
+                                  • {b.name}
+                                  {b.isGuest && <span className="text-gray-500"> (invité)</span>}
+                                  {b.massageType ? ` — ${b.massageType}` : ""}
+                                </span>
                                 {b.price != null && (
                                   <span className="text-gray-500 pl-3">
                                     {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(b.price)}
@@ -1844,8 +1884,8 @@ export function WeeklyCalendar({
                                 )}
                                 {!b.invoiced && !isPast(selectedSession) && (
                                   <button
-                                    onClick={() => handleAdminCancelBookingForMember(selectedSession, b.memberId)}
-                                    disabled={adminBooking}
+                                    onClick={() => handleCancelMassageBookingById(selectedSession, b.id)}
+                                    disabled={cancellingMassageBookingId === b.id}
                                     className="text-red-400/60 hover:text-red-400 text-[10px] shrink-0 transition-colors disabled:opacity-40"
                                     title="Désinscrire"
                                   >
@@ -1861,24 +1901,61 @@ export function WeeklyCalendar({
                       )}
                     </div>
 
-                    {!isPast(selectedSession) && adminMembers.length > 0 && selectedSession.current_participants < selectedSession.max_participants && (
+                    {!isPast(selectedSession) && selectedSession.current_participants < selectedSession.max_participants && (
                       <div className="border rounded-lg p-3 space-y-2 bg-[#1a1a1a] border-[#2a2a2a]">
-                        <p className="text-xs font-medium text-gray-300">Réserver pour un adhérent</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-gray-300">Réserver ce créneau</p>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => { setMassageGuestMode(false); setAdminBookingError(""); }}
+                              className={`text-[10px] px-2 py-1 rounded-md transition-colors ${!massageGuestMode ? "bg-[#D4AF37]/15 text-[#D4AF37]" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                              Adhérent
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setMassageGuestMode(true); setAdminBookingError(""); }}
+                              className={`text-[10px] px-2 py-1 rounded-md transition-colors ${massageGuestMode ? "bg-[#D4AF37]/15 text-[#D4AF37]" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                              Non-inscrit
+                            </button>
+                          </div>
+                        </div>
                         {adminBookingError && (
                           <p className="text-xs text-red-400">{adminBookingError}</p>
                         )}
-                        <select
-                          value={adminBookingMemberId}
-                          onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
-                          className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
-                        >
-                          <option value="">Choisir un adhérent...</option>
-                          {adminMembers.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.first_name} {m.last_name}
-                            </option>
-                          ))}
-                        </select>
+                        {massageGuestMode ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={massageGuestName}
+                              onChange={(e) => setMassageGuestName(e.target.value)}
+                              placeholder="Nom du client"
+                              className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                            />
+                            <input
+                              type="email"
+                              value={massageGuestEmail}
+                              onChange={(e) => setMassageGuestEmail(e.target.value)}
+                              placeholder="Email (optionnel, pour la confirmation)"
+                              className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                            />
+                          </div>
+                        ) : (
+                          <select
+                            value={adminBookingMemberId}
+                            onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                            className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                          >
+                            <option value="">Choisir un adhérent...</option>
+                            {adminMembers.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.first_name} {m.last_name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <div className="flex gap-2">
                           <select
                             value={adminMassageProductId}
@@ -1896,7 +1973,7 @@ export function WeeklyCalendar({
                             size="sm"
                             onClick={() => handleAdminBookMassageForMember(selectedSession)}
                             loading={adminBooking}
-                            disabled={!adminBookingMemberId || !adminMassageProductId}
+                            disabled={!adminMassageProductId || (massageGuestMode ? !massageGuestName.trim() : !adminBookingMemberId)}
                           >
                             Réserver
                           </Button>

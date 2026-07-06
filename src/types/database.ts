@@ -139,31 +139,35 @@ export interface Database {
       orders: {
         Row: {
           id: string;
-          member_id: string;
+          member_id: string | null;
           product_id: string;
           amount: number;
           sessions_purchased: number;
           invoice_number: string;
           status: "pending" | "paid" | "cancelled";
           payment_method: string | null;
+          guest_name: string | null;
+          guest_email: string | null;
           created_at: string;
           paid_at: string | null;
         };
         Insert: {
           id?: string;
-          member_id: string;
+          member_id?: string | null;
           product_id: string;
           amount: number;
           sessions_purchased: number;
           invoice_number?: string;
           status?: "pending" | "paid" | "cancelled";
           payment_method?: string | null;
+          guest_name?: string | null;
+          guest_email?: string | null;
           created_at?: string;
           paid_at?: string | null;
         };
         Update: {
           id?: string;
-          member_id?: string;
+          member_id?: string | null;
           product_id?: string;
           amount?: number;
           sessions_purchased?: number;
@@ -324,7 +328,7 @@ export interface Database {
       class_bookings: {
         Row: {
           id: string;
-          member_id: string;
+          member_id: string | null;
           class_session_id: string;
           status: "confirmed" | "cancelled";
           session_debited: boolean;
@@ -333,12 +337,14 @@ export interface Database {
           massage_price: number | null;
           massage_discount_applied: boolean;
           invoice_order_id: string | null;
+          guest_name: string | null;
+          guest_email: string | null;
           booked_at: string;
           cancelled_at: string | null;
         };
         Insert: {
           id?: string;
-          member_id: string;
+          member_id?: string | null;
           class_session_id: string;
           status?: "confirmed" | "cancelled";
           session_debited?: boolean;
@@ -347,6 +353,8 @@ export interface Database {
           massage_price?: number | null;
           massage_discount_applied?: boolean;
           invoice_order_id?: string | null;
+          guest_name?: string | null;
+          guest_email?: string | null;
           booked_at?: string;
           cancelled_at?: string | null;
         };
@@ -519,7 +527,15 @@ export interface Database {
         Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
       };
       book_massage_session: {
-        Args: { p_member_id: string; p_session_id: string; p_product_id: string; p_price: number; p_discount_applied: boolean };
+        Args: {
+          p_session_id: string;
+          p_product_id: string;
+          p_price: number;
+          p_discount_applied: boolean;
+          p_member_id?: string | null;
+          p_guest_name?: string | null;
+          p_guest_email?: string | null;
+        };
         Returns: { success: boolean; error?: string };
       };
     };

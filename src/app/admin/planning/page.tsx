@@ -509,7 +509,7 @@ export default function AdminPlanningPage() {
         .eq("status", "confirmed");
 
       for (const b of confirmedBookings) {
-        if (b.session_debited) {
+        if (b.session_debited && b.member_id) {
           const rpcFn = editingSession.session_type === "individual"
             ? "increment_individual_balance"
             : editingSession.session_type === "duo"
@@ -520,7 +520,7 @@ export default function AdminPlanningPage() {
       }
 
       // Send cancellation emails to all booked members
-      const memberIds = [...new Set(confirmedBookings.map((b) => b.member_id))];
+      const memberIds = [...new Set(confirmedBookings.map((b) => b.member_id).filter((id): id is string => !!id))];
       const sessionName = editingSession.class_types.name;
       const dateObj = new Date(editingSession.start_time);
       const sessionDate = dateObj.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });

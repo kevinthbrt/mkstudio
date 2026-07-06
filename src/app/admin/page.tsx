@@ -61,7 +61,7 @@ export default async function AdminDashboard() {
       .eq("status", "confirmed");
 
     if (rawBookings && rawBookings.length > 0) {
-      const memberIds = [...new Set(rawBookings.map((b) => b.member_id))];
+      const memberIds = [...new Set(rawBookings.map((b) => b.member_id).filter((id): id is string => !!id))];
       const { data: profileRows } = await supabase
         .from("profiles")
         .select("id, first_name, last_name")
@@ -72,7 +72,7 @@ export default async function AdminDashboard() {
         id: b.id,
         class_session_id: b.class_session_id,
         guest_names: b.guest_names,
-        profiles: profileMap.get(b.member_id) ?? null,
+        profiles: b.member_id ? profileMap.get(b.member_id) ?? null : null,
       }));
     }
   }
