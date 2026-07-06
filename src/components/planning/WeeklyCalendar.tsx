@@ -23,7 +23,7 @@ import {
   formatTime,
   formatDate,
 } from "@/lib/utils";
-import { computeMassagePrice } from "@/lib/massagePricing";
+import { computeMassagePrice, MASSAGE_DISCOUNT_RATE } from "@/lib/massagePricing";
 
 export interface ClassSessionWithType {
   id: string;
@@ -1010,18 +1010,38 @@ export function WeeklyCalendar({
     return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
   }
 
-  function massageStartingPriceLabel(): string {
-    if (massageProducts.length === 0) return "Massage";
-    const cheapest = Math.min(...massageProducts.map((p) => p.price));
-    const price = computeMassagePrice(cheapest, massageDiscountEligible);
-    return `Dès ${formatEuro(price)}${massageDiscountEligible ? " (-15%)" : ""}`;
+  // Renders "60,00 €" plain, or "60,00 € 51,00 €" with the original price
+  // struck through and the discounted price highlighted, when eligible.
+  function renderMassagePrice(basePrice: number, discountApplied: boolean, prefix?: string) {
+    if (!discountApplied) {
+      return (
+        <>
+          {prefix}
+          {formatEuro(basePrice)}
+        </>
+      );
+    }
+    const finalPrice = computeMassagePrice(basePrice, true);
+    return (
+      <>
+        {prefix}
+        <span className="line-through text-gray-500 mr-1">{formatEuro(basePrice)}</span>
+        <span className="text-[#D4AF37] font-bold">{formatEuro(finalPrice)}</span>
+        <span className="text-[10px] text-[#D4AF37] ml-1">-15%</span>
+      </>
+    );
   }
 
-  function selectedMassagePriceLabel(): string {
+  function massageStartingPriceDisplay() {
+    if (massageProducts.length === 0) return "Massage";
+    const cheapest = Math.min(...massageProducts.map((p) => p.price));
+    return renderMassagePrice(cheapest, massageDiscountEligible, "Dès ");
+  }
+
+  function selectedMassagePriceDisplay() {
     const product = massageProducts.find((p) => p.id === selectedMassageProductId);
-    if (!product) return "";
-    const price = computeMassagePrice(product.price, massageDiscountEligible);
-    return `${formatEuro(price)}${massageDiscountEligible ? " (-15%)" : ""}`;
+    if (!product) return null;
+    return renderMassagePrice(product.price, massageDiscountEligible);
   }
 
   if (loading) {
@@ -1195,7 +1215,7 @@ export function WeeklyCalendar({
                         )}
                         {isMassage && (
                           <p className="text-pink-400 text-xs mt-0.5 font-medium">
-                            {massageStartingPriceLabel()}
+                            {massageStartingPriceDisplay()}
                           </p>
                         )}
                         {/* Booking / waitlist CTA for members - collective sessions only */}
@@ -1349,7 +1369,7 @@ export function WeeklyCalendar({
                         )}
                         {isMassage && !isAdmin && (
                           <p className="text-xs text-pink-400 mt-0.5 truncate">
-                            {massageStartingPriceLabel()}
+                            {massageStartingPriceDisplay()}
                           </p>
                         )}
                         {isAdmin && !isIndividual && !isMassage && (
@@ -1718,13 +1738,19 @@ export function WeeklyCalendar({
                         </option>
                       ))}
                     </select>
+                    {selectedMassageProductId && (
+                      <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2">
+                        <span className="text-xs text-gray-500">Prix à régler sur place</span>
+                        <span className="text-sm">{selectedMassagePriceDisplay()}</span>
+                      </div>
+                    )}
                     <Button
                       className="w-full"
                       onClick={() => handleBookMassage(selectedSession)}
                       loading={massageBooking}
                       disabled={!selectedMassageProductId}
                     >
-                      {selectedMassageProductId ? `Réserver (${selectedMassagePriceLabel()})` : "Réserver"}
+                      Réserver
                     </Button>
                   </div>
                 )}
@@ -1865,9 +1891,13 @@ export function WeeklyCalendar({
                                   {b.massageType ? ` — ${b.massageType}` : ""}
                                 </span>
                                 {b.price != null && (
-                                  <span className="text-gray-500 pl-3">
-                                    {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(b.price)}
-                                    {b.discountApplied ? " (-15%)" : ""}
+                                  <span className="pl-3">
+                                    {b.discountApplied
+                                      ? renderMassagePrice(
+                                          massageProducts.find((p) => p.name === b.massageType)?.price ?? b.price / (1 - MASSAGE_DISCOUNT_RATE),
+                                          true
+                                        )
+                                      : <span className="text-gray-500">{formatEuro(b.price)}</span>}
                                   </span>
                                 )}
                               </div>

@@ -379,10 +379,14 @@ export async function sendMassageBookingConfirmationEmail(params: {
   sessionTime: string;
   coachName: string;
   price: number;
+  basePrice: number;
   discountApplied: boolean;
 }) {
-  const { to, firstName, massageName, sessionDate, sessionTime, coachName, price, discountApplied } = params;
-  const formattedPrice = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(price);
+  const { to, firstName, massageName, sessionDate, sessionTime, coachName, price, basePrice, discountApplied } = params;
+  const formatEuro = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+  const priceHtml = discountApplied
+    ? `<span style="text-decoration:line-through;color:#6b7280;margin-right:6px;">${formatEuro(basePrice)}</span><span style="color:#D4AF37;font-weight:700;">${formatEuro(price)}</span> <span style="color:#D4AF37;font-size:11px;">-15%</span>`
+    : formatEuro(price);
 
   const html = layout(`
     <div style="display:inline-block;background:#16a34a22;border:1px solid #16a34a44;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
@@ -395,7 +399,7 @@ export async function sendMassageBookingConfirmationEmail(params: {
       ${infoRow("Date", sessionDate)}
       ${infoRow("Horaire", sessionTime)}
       ${infoRow("Avec", coachName)}
-      ${infoRow("Prix", `${formattedPrice}${discountApplied ? " (-15% adhérent appliqué)" : ""}`)}
+      ${infoRow("Prix", priceHtml)}
     </table>
     ${divider()}
     <div style="background:#D4AF3711;border:1px solid #D4AF3733;border-radius:10px;padding:14px;margin-bottom:8px;">

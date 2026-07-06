@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       sessionTime,
       coachName: session.coach_name,
       price,
+      basePrice: massageProduct.price,
       discountApplied: eligible,
     }).catch(() => {});
   }
