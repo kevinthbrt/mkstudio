@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await admin
     .from("class_bookings")
-    .select("guest_names, profiles (first_name, last_name)")
+    .select("guest_names, guest_name, profiles (first_name, last_name)")
     .eq("class_session_id", sessionId)
     .eq("status", "confirmed");
 
@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     (data || []).map((b: any) => {
+      if (!b.profiles) {
+        return { name: b.guest_name ?? "Invité", guest_names: b.guest_names ?? null };
+      }
       const firstName = b.profiles?.first_name ?? "";
       const lastName = b.profiles?.last_name ?? "";
       const name = lastName

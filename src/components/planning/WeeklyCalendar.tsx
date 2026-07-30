@@ -103,11 +103,14 @@ export function WeeklyCalendar({
   const [revealingWeek, setRevealingWeek] = useState(false);
   const [inviteFriends, setInviteFriends] = useState(false);
   const [friendNames, setFriendNames] = useState("");
-  const [sessionBookees, setSessionBookees] = useState<{ name: string; guest_names: string | null }[]>([]);
+  const [sessionBookees, setSessionBookees] = useState<{ id: string; memberId: string | null; name: string; isGuest: boolean; guestEmail: string | null; guest_names: string | null }[]>([]);
   const [loadingBookees, setLoadingBookees] = useState(false);
   const [adminBookingMemberId, setAdminBookingMemberId] = useState("");
   const [adminBooking, setAdminBooking] = useState(false);
   const [adminBookingError, setAdminBookingError] = useState("");
+  const [sessionGuestMode, setSessionGuestMode] = useState(false);
+  const [sessionGuestName, setSessionGuestName] = useState("");
+  const [sessionGuestEmail, setSessionGuestEmail] = useState("");
   const [waitlists, setWaitlists] = useState<Record<string, number>>({});
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [adminWaitlist, setAdminWaitlist] = useState<{ id: string; position: number; member_id: string; name: string }[]>([]);
@@ -632,6 +635,107 @@ export function WeeklyCalendar({
       body: JSON.stringify({ sessionId: session.id }),
     }).then(() => {
       // Refresh waitlist display after promotion attempt
+      if (session.session_type === "collective") {
+        loadAdminWaitlist(session.id);
+      }
+    }).catch(() => {});
+
+    setAdminBooking(false);
+  }
+
+  async function handleAdminBookGuestForSession(session: ClassSessionWithType) {
+    if (!sessionGuestName.trim()) return;
+    setAdminBooking(true);
+    setAdminBookingError("");
+
+    const spotsLeft = session.max_participants - session.current_participants;
+    if (spotsLeft < 1) {
+      setAdminBookingError("Ce cours est complet.");
+      setAdminBooking(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.from("class_bookings").insert({
+      member_id: null,
+      class_session_id: session.id,
+      status: "confirmed",
+      session_debited: false,
+      guest_name: sessionGuestName.trim(),
+      guest_email: sessionGuestEmail.trim() || null,
+      booked_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      setAdminBookingError("Une erreur est survenue. Réessayez.");
+      setAdminBooking(false);
+      return;
+    }
+
+    await supabase.rpc("increment_participants", { session_id: session.id });
+
+    await loadSessionBookees(session.id);
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id ? { ...sess, current_participants: sess.current_participants + 1 } : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: prev.current_participants + 1 } : null
+    );
+
+    if (sessionGuestEmail.trim()) {
+      fetch("/api/admin/emails/guest-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: sessionGuestEmail.trim(),
+          firstName: sessionGuestName.trim(),
+          sessionName: session.class_types.name,
+          sessionDate: formatDate(session.start_time),
+          sessionTime: `${formatTime(session.start_time)} – ${formatTime(session.end_time)}`,
+          coachName: session.coach_name,
+        }),
+      }).catch(() => {});
+    }
+
+    setSessionGuestName("");
+    setSessionGuestEmail("");
+    setSessionGuestMode(false);
+    setAdminBooking(false);
+  }
+
+  async function handleAdminCancelGuestBooking(session: ClassSessionWithType, bookingId: string) {
+    setAdminBooking(true);
+    setAdminBookingError("");
+
+    const supabase = createClient();
+
+    await supabase
+      .from("class_bookings")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .eq("id", bookingId);
+
+    await supabase.rpc("decrement_participants", { session_id: session.id });
+
+    await loadSessionBookees(session.id);
+    setSessions((s) =>
+      s.map((sess) =>
+        sess.id === session.id
+          ? { ...sess, current_participants: Math.max(0, sess.current_participants - 1) }
+          : sess
+      )
+    );
+    setSelectedSession((prev) =>
+      prev ? { ...prev, current_participants: Math.max(0, prev.current_participants - 1) } : null
+    );
+
+    // Trigger waitlist promotion
+    fetch("/api/waitlist/promote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: session.id }),
+    }).then(() => {
       if (session.session_type === "collective") {
         loadAdminWaitlist(session.id);
       }
@@ -1439,6 +1543,9 @@ export function WeeklyCalendar({
             setMassageGuestMode(false);
             setMassageGuestName("");
             setMassageGuestEmail("");
+            setSessionGuestMode(false);
+            setSessionGuestName("");
+            setSessionGuestEmail("");
           }}
           title={selectedSession.class_types.name}
         >
@@ -1774,33 +1881,42 @@ export function WeeklyCalendar({
                         <p className="text-xs text-gray-600">Chargement...</p>
                       ) : sessionBookees.length > 0 ? (
                         <ul className="space-y-1">
-                          {sessionBookees.map((b, i) => {
-                            const member = adminMembers.find(
-                              (m) => `${m.first_name} ${m.last_name}`.trim() === b.name
-                            );
-                            return (
-                              <li key={i} className="text-xs text-white flex items-center justify-between gap-2">
-                                <div className="flex flex-col">
-                                  <span>• {b.name}</span>
-                                  {b.guest_names && (
-                                    <span className="text-gray-500 pl-3">
-                                      + {b.guest_names}
-                                    </span>
-                                  )}
-                                </div>
-                                {member && !isPast(selectedSession) && (
+                          {sessionBookees.map((b) => (
+                            <li key={b.id} className="text-xs text-white flex items-center justify-between gap-2">
+                              <div className="flex flex-col">
+                                <span>
+                                  • {b.name}
+                                  {b.isGuest && <span className="text-gray-500"> (invité, sans compte)</span>}
+                                </span>
+                                {b.guest_names && (
+                                  <span className="text-gray-500 pl-3">
+                                    + {b.guest_names}
+                                  </span>
+                                )}
+                              </div>
+                              {!isPast(selectedSession) && (
+                                b.isGuest ? (
                                   <button
-                                    onClick={() => handleAdminCancelBookingForMember(selectedSession, member.id)}
+                                    onClick={() => handleAdminCancelGuestBooking(selectedSession, b.id)}
                                     disabled={adminBooking}
                                     className="text-red-400/60 hover:text-red-400 text-[10px] shrink-0 transition-colors disabled:opacity-40"
                                     title="Désinscrire"
                                   >
                                     ✕
                                   </button>
-                                )}
-                              </li>
-                            );
-                          })}
+                                ) : b.memberId ? (
+                                  <button
+                                    onClick={() => handleAdminCancelBookingForMember(selectedSession, b.memberId!)}
+                                    disabled={adminBooking}
+                                    className="text-red-400/60 hover:text-red-400 text-[10px] shrink-0 transition-colors disabled:opacity-40"
+                                    title="Désinscrire"
+                                  >
+                                    ✕
+                                  </button>
+                                ) : null
+                              )}
+                            </li>
+                          ))}
                         </ul>
                       ) : (
                         <p className="text-xs text-gray-600 italic">Aucun inscrit</p>
@@ -1833,39 +1949,92 @@ export function WeeklyCalendar({
                       </div>
                     )}
 
-                    {/* Admin book for member */}
-                    {!isPast(selectedSession) && adminMembers.length > 0 && (
+                    {/* Admin book for member or guest */}
+                    {!isPast(selectedSession) && (
                       <div className={`border rounded-lg p-3 space-y-2 ${selectedSession.session_type === "duo" ? "bg-purple-500/5 border-purple-500/20" : "bg-[#1a1a1a] border-[#2a2a2a]"}`}>
-                        <p className="text-xs font-medium text-gray-300">Inscrire un adhérent</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-gray-300">
+                            {sessionGuestMode ? "Inscrire un invité" : "Inscrire un adhérent"}
+                          </p>
+                          {adminMembers.length > 0 && (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => { setSessionGuestMode(false); setAdminBookingError(""); }}
+                                className={`text-[10px] px-2 py-1 rounded-md transition-colors ${!sessionGuestMode ? "bg-[#D4AF37]/15 text-[#D4AF37]" : "text-gray-500 hover:text-gray-300"}`}
+                              >
+                                Adhérent
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setSessionGuestMode(true); setAdminBookingError(""); }}
+                                className={`text-[10px] px-2 py-1 rounded-md transition-colors ${sessionGuestMode ? "bg-[#D4AF37]/15 text-[#D4AF37]" : "text-gray-500 hover:text-gray-300"}`}
+                              >
+                                Invité (sans compte)
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         {adminBookingError && (
                           <p className="text-xs text-red-400">{adminBookingError}</p>
                         )}
-                        <div className="flex gap-2">
-                          <select
-                            value={adminBookingMemberId}
-                            onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
-                            className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
-                          >
-                            <option value="">Choisir un adhérent...</option>
-                            {adminMembers.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {selectedSession.session_type === "duo"
-                                  ? `${m.first_name} ${m.last_name} (${m.duo_balance} séance${m.duo_balance !== 1 ? "s" : ""} duo)`
-                                  : selectedSession.session_type === "individual"
-                                  ? `${m.first_name} ${m.last_name} (${m.individual_balance} séance${m.individual_balance !== 1 ? "s" : ""} indiv)`
-                                  : `${m.first_name} ${m.last_name} (${m.collective_balance} séance${m.collective_balance !== 1 ? "s" : ""})`}
-                              </option>
-                            ))}
-                          </select>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAdminBookForMember(selectedSession)}
-                            loading={adminBooking}
-                            disabled={!adminBookingMemberId}
-                          >
-                            Inscrire
-                          </Button>
-                        </div>
+                        {sessionGuestMode || adminMembers.length === 0 ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={sessionGuestName}
+                              onChange={(e) => setSessionGuestName(e.target.value)}
+                              placeholder="Nom de l'invité"
+                              className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                            />
+                            <input
+                              type="email"
+                              value={sessionGuestEmail}
+                              onChange={(e) => setSessionGuestEmail(e.target.value)}
+                              placeholder="Email (optionnel, pour la confirmation)"
+                              className="w-full bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                            />
+                            <p className="text-[10px] text-gray-500">
+                              Aucune séance ne sera décomptée — à gérer au cas par cas.
+                            </p>
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => handleAdminBookGuestForSession(selectedSession)}
+                              loading={adminBooking}
+                              disabled={!sessionGuestName.trim()}
+                            >
+                              Inscrire l&apos;invité
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <select
+                              value={adminBookingMemberId}
+                              onChange={(e) => { setAdminBookingMemberId(e.target.value); setAdminBookingError(""); }}
+                              className="flex-1 bg-[#111] border border-[#3a3a3a] text-white rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#D4AF37]"
+                            >
+                              <option value="">Choisir un adhérent...</option>
+                              {adminMembers.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {selectedSession.session_type === "duo"
+                                    ? `${m.first_name} ${m.last_name} (${m.duo_balance} séance${m.duo_balance !== 1 ? "s" : ""} duo)`
+                                    : selectedSession.session_type === "individual"
+                                    ? `${m.first_name} ${m.last_name} (${m.individual_balance} séance${m.individual_balance !== 1 ? "s" : ""} indiv)`
+                                    : `${m.first_name} ${m.last_name} (${m.collective_balance} séance${m.collective_balance !== 1 ? "s" : ""})`}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAdminBookForMember(selectedSession)}
+                              loading={adminBooking}
+                              disabled={!adminBookingMemberId}
+                            >
+                              Inscrire
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
