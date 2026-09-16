@@ -21,19 +21,19 @@ export const hero = {
   eyebrow: "Le Vigan en Quercy",
   title: "S'entraîner encadré, récupérer sur place.",
   subtitle:
-    "MK Studio, c'est du coaching avec un programme construit pour vous, seul ou en duo, et des cours collectifs à neuf personnes maximum. Sur place également : ostéopathie, massages et drainage lymphatique.",
+    "MK Studio, c'est du coaching avec un programme construit pour vous, seul ou en duo, et des cours collectifs à huit personnes maximum. Sur place également : ostéopathie, massages et drainage lymphatique.",
   primaryCta: "Créer mon compte",
   secondaryCta: "Voir les prestations",
   points: [
     "Coach présent à chaque séance",
-    "9 personnes maximum en collectif",
+    "8 personnes maximum en collectif",
     "Réservation en ligne",
   ],
 };
 
 export const highlights = [
   {
-    value: "9",
+    value: "8",
     label: "personnes maximum",
     detail: "En cours collectif",
   },
@@ -74,14 +74,14 @@ export const coaching = {
   },
   collectif: {
     name: "Cours collectifs",
-    tag: "9 personnes maximum",
+    tag: "8 personnes maximum",
     description:
-      "Un programme commun, neuf personnes maximum, et un coach qui circule pour corriger les postures. À ce nombre-là, personne ne passe inaperçu et l'ambiance reste familiale.",
+      "Un programme commun, huit personnes maximum, et un coach qui circule pour corriger les postures. À ce nombre-là, personne ne passe inaperçu et l'ambiance reste familiale.",
     bullets: [
-      "9 personnes maximum par cours",
+      "8 personnes maximum par cours",
       "Le coach corrige pendant la séance",
       "Cours adaptés à tous les niveaux",
-      "Planning fixe, réservation en ligne",
+      "Réservation simple, en ligne",
     ],
   },
   planning: {
@@ -149,12 +149,12 @@ export const osteopathie = {
     ],
   },
   cta: "Prendre rendez-vous",
-  ctaHref: "tel:0675259993",
-  ctaNote: "Rendez-vous par téléphone au 06 75 25 99 93 ou sur Doctolib.",
+  ctaHref: "https://www.doctolib.fr/osteopathe/le-vigan/kevin-thubert",
+  ctaNote: "Prise de rendez-vous sur Doctolib, ou par téléphone au 06 75 25 99 93.",
   practitioner: {
     name: "Kevin Thubert",
     role: "Ostéopathe D.O.",
-    bio: "À compléter",
+    bio: "Consulte à MK Studio sur rendez-vous.",
   },
 };
 
@@ -243,12 +243,12 @@ export const equipe = {
     {
       name: "Manon Delmas",
       role: "Coach sportive & masseuse",
-      bio: "À compléter",
+      bio: "Manon anime tous les cours de la salle, du cross training au Pilates en passant par le cours seniors, et construit les programmes de coaching individuel et en duo. C'est aussi elle qui pratique les massages et le drainage lymphatique.",
     },
     {
       name: "Kevin Thubert",
       role: "Ostéopathe D.O.",
-      bio: "À compléter",
+      bio: "Kevin consulte en ostéopathie dans la salle, sur rendez-vous. Il reçoit aussi bien les adhérents de MK Studio que des patients venus pour tout autre motif : femmes enceintes, personnes âgées, nourrissons.",
     },
   ],
 };
@@ -270,7 +270,7 @@ export const faq = {
     },
     {
       q: "Quelle différence entre le duo et le cours collectif ?",
-      a: "En duo, chacun suit son propre programme : le suivi reste individualisé, vous partagez seulement la salle, ce qui réduit le coût par personne. En cours collectif, le programme est commun au groupe, jusqu'à neuf personnes.",
+      a: "En duo, chacun suit son propre programme : le suivi reste individualisé, vous partagez seulement la salle, ce qui réduit le coût par personne. En cours collectif, le programme est commun au groupe, jusqu'à huit personnes.",
     },
     {
       q: "Comment je réserve ?",
@@ -303,7 +303,8 @@ export const acces = {
     { label: "Coaching et massages", value: "07 87 02 05 65", href: "tel:0787020565" },
     { label: "Ostéopathie", value: "06 75 25 99 93", href: "tel:0675259993" },
   ],
-  parking: "À compléter",
+  /** Laisser vide masque la ligne sur la page. */
+  parking: "",
 };
 
 export const finalCta = {

@@ -282,6 +282,8 @@ export function LandingPage() {
 
             <a
               href={osteopathie.ctaHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#14131A] px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2A2823]"
             >
               {osteopathie.cta}
@@ -464,7 +466,7 @@ export function LandingPage() {
                       {line}
                     </p>
                   ))}
-                  <p className="mt-1 text-[#8A8470]">{acces.parking}</p>
+                  {acces.parking && <p className="mt-1 text-[#8A8470]">{acces.parking}</p>}
                 </div>
               </div>
 
