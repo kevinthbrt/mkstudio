@@ -154,7 +154,6 @@ export const osteopathie = {
   practitioner: {
     name: "Kevin Thubert",
     role: "Ostéopathe D.O.",
-    bio: "Consulte à MK Studio sur rendez-vous.",
   },
 };
 
@@ -243,12 +242,10 @@ export const equipe = {
     {
       name: "Manon Delmas",
       role: "Coach sportive & masseuse",
-      bio: "Manon anime tous les cours de la salle, du cross training au Pilates en passant par le cours seniors, et construit les programmes de coaching individuel et en duo. C'est aussi elle qui pratique les massages et le drainage lymphatique.",
     },
     {
       name: "Kevin Thubert",
       role: "Ostéopathe D.O.",
-      bio: "Kevin consulte en ostéopathie dans la salle, sur rendez-vous. Il reçoit aussi bien les adhérents de MK Studio que des patients venus pour tout autre motif : femmes enceintes, personnes âgées, nourrissons.",
     },
   ],
 };
@@ -304,7 +301,7 @@ export const acces = {
     { label: "Ostéopathie", value: "06 75 25 99 93", href: "tel:0675259993" },
   ],
   /** Laisser vide masque la ligne sur la page. */
-  parking: "",
+  parking: "Parking devant la salle.",
 };
 
 export const finalCta = {

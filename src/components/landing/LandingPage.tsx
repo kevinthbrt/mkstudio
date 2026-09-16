@@ -276,7 +276,6 @@ export function LandingPage() {
               <div>
                 <p className="text-sm font-bold text-[#14131A]">{osteopathie.practitioner.name}</p>
                 <p className="text-xs text-[#8A8470]">{osteopathie.practitioner.role}</p>
-                <p className="mt-1 text-sm text-[#55524A]">{osteopathie.practitioner.bio}</p>
               </div>
             </div>
 
@@ -393,12 +392,11 @@ export function LandingPage() {
                   className="rounded-none border-0 sm:w-40 sm:flex-shrink-0 sm:border-r sm:border-dashed"
                   label="Portrait"
                 />
-                <div className="p-6">
+                <div className="flex flex-col justify-center p-6">
                   <p className="text-lg font-bold text-[#14131A]">{m.name}</p>
-                  <p className="text-xs font-medium uppercase tracking-wider text-[#C9A227]">
+                  <p className="mt-1 text-xs font-medium uppercase tracking-wider text-[#C9A227]">
                     {m.role}
                   </p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#55524A]">{m.bio}</p>
                 </div>
               </div>
             ))}
