@@ -65,3 +65,11 @@ body {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Thème clair : réservé à la landing page publique.
+   Le reste de l'application (espace adhérent / admin) reste en thème sombre. */
+html:has(.landing-light),
+html:has(.landing-light) body {
+  background: #ffffff;
+  color: #14131A;
+}
