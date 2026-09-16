@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { landingNav } from "@/content/landing";
+import { Logo } from "@/components/landing/Logo";
 
 export function LandingNav() {
   const [open, setOpen] = useState(false);
@@ -12,9 +13,7 @@ export function LandingNav() {
     <header className="sticky top-0 z-50 border-b border-[#ECEAE3] bg-white/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#E8C84A] via-[#D4AF37] to-[#B8941E] text-sm font-black tracking-tight text-[#14131A]">
-            MK
-          </span>
+          <Logo size={38} />
           <span className="text-base font-bold tracking-tight text-[#14131A]">MK Studio</span>
         </Link>
 

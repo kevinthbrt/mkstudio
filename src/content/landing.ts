@@ -16,29 +16,29 @@ export const landingNav = {
 };
 
 export const hero = {
-  eyebrow: "Salle de sport à taille humaine",
+  eyebrow: "Le Vigan-en-Quercy",
   title: "S'entraîner encadré, récupérer sur place.",
   subtitle:
-    "MK Studio, c'est du coaching en petit groupe, en duo ou en solo, toujours avec un coach dans la salle. Et quand le corps a besoin d'autre chose : ostéopathie, massages et drainage lymphatique, au même endroit.",
+    "MK Studio, c'est du coaching avec un programme construit pour vous, seul ou à deux ou trois, et des cours collectifs à neuf personnes maximum. Sur place, également : ostéopathie, massages et drainage lymphatique.",
   primaryCta: "Créer mon compte",
   secondaryCta: "Voir les prestations",
   points: [
     "Coach présent à chaque séance",
-    "Groupes limités",
+    "9 personnes maximum en collectif",
     "Réservation en ligne",
   ],
 };
 
 export const highlights = [
   {
-    value: "3",
-    label: "formats de cours",
-    detail: "Collectif, duo, solo",
+    value: "9",
+    label: "personnes maximum",
+    detail: "En cours collectif",
   },
   {
-    value: "—",
-    label: "personnes max par cours",
-    detail: "À compléter",
+    value: "1 à 3",
+    label: "en coaching individualisé",
+    detail: "Programme propre à chacun",
   },
   {
     value: "-15 %",
@@ -49,50 +49,61 @@ export const highlights = [
 
 export const coaching = {
   eyebrow: "Coaching",
-  title: "Trois façons de s'entraîner",
+  title: "Deux façons de s'entraîner",
   intro:
-    "Tous les cours sont encadrés. L'accès aux machines se fait en présence du coach, jamais seul.",
-  formats: [
-    {
-      name: "Cours collectif",
-      duration: "—",
-      description:
-        "En petit groupe, avec un coach qui corrige et adapte les exercices. Le nombre de places est limité pour que chacun soit suivi.",
-      bullets: ["Places limitées", "Liste d'attente automatique", "Réservation depuis votre espace"],
-    },
-    {
-      name: "Duo",
-      duration: "—",
-      description:
-        "À deux, avec un coach rien que pour vous. Le bon compromis entre l'émulation du collectif et l'attention du suivi individuel.",
-      bullets: ["Deux participants", "Programme adapté au binôme", "Annulation jusqu'à 24 h avant"],
-    },
-    {
-      name: "Individuel",
-      duration: "—",
-      description:
-        "Un coach, une personne. Le contenu de la séance est construit sur vos objectifs, votre niveau et vos contraintes.",
-      bullets: ["Suivi personnalisé", "Rythme libre", "Annulation jusqu'à 24 h avant"],
-    },
-  ],
+    "Dans les deux cas, le coach est dans la salle. L'accès aux machines se fait en sa présence, jamais seul.",
+  individualise: {
+    name: "Coaching individualisé",
+    description:
+      "Le programme est construit pour vous : votre niveau, vos objectifs, vos contraintes. Deux façons de le suivre.",
+    options: [
+      {
+        name: "Solo",
+        description:
+          "Vous êtes seul dans la salle avec le coach. Son attention est entièrement sur vous, du début à la fin de la séance.",
+      },
+      {
+        name: "À deux ou trois",
+        description:
+          "Chacun suit son propre programme, mais vous partagez la salle. Le suivi reste individualisé, le coût par personne baisse.",
+      },
+    ],
+  },
+  collectif: {
+    name: "Cours collectifs",
+    description:
+      "Un programme commun, neuf personnes maximum, et un coach qui circule pour corriger les postures. À ce nombre-là, personne ne passe inaperçu et l'ambiance reste familiale.",
+    bullets: [
+      "9 personnes maximum par cours",
+      "Le coach corrige pendant la séance",
+      "Planning fixe, réservation en ligne",
+    ],
+  },
 };
 
 export const osteopathie = {
   eyebrow: "Ostéopathie",
-  title: "Un ostéopathe dans la salle",
+  title: "Un cabinet d'ostéopathie dans la salle",
   paragraphs: [
-    "Un ostéopathe consulte directement à MK Studio. Pas besoin d'aller ailleurs : la séance se fait dans le même lieu que vos entraînements.",
-    "Douleurs de dos, épaule bloquée, tensions liées au travail ou à la reprise du sport : la consultation part de ce que vous ressentez et de ce que vous faites en salle.",
+    "L'ostéopathie à MK Studio, c'est Kevin Thubert. Le cabinet est dans les mêmes murs que la salle, sur rendez-vous.",
+    "La consultation s'adresse à tout le monde, pas seulement aux sportifs. Elle porte principalement sur les troubles musculo-squelettiques — douleurs aiguës comme chroniques — et sur les troubles d'ordre viscéral.",
   ],
-  motifs: [
-    "Douleurs lombaires et cervicales",
-    "Tensions musculaires et raideurs",
-    "Suivi de reprise après blessure",
-    "Gêne articulaire à l'entraînement",
-  ],
+  pourQui: {
+    title: "Pour qui",
+    items: ["Sportifs", "Femmes enceintes", "Personnes âgées", "Nourrissons"],
+  },
+  pourQuoi: {
+    title: "Pour quoi",
+    items: [
+      "Douleurs aiguës ou chroniques",
+      "Troubles musculo-squelettiques",
+      "Troubles viscéraux",
+      "Suivi de reprise après blessure",
+    ],
+  },
   cta: "Prendre rendez-vous",
   practitioner: {
-    name: "—",
+    name: "Kevin Thubert",
     role: "Ostéopathe D.O.",
     bio: "À compléter",
   },
@@ -102,25 +113,23 @@ export const massages = {
   eyebrow: "Massages & drainage",
   title: "Récupération et bien-être",
   intro:
-    "Les séances se réservent en ligne, comme les cours. Les adhérents avec des séances en cours bénéficient de 15 % de réduction.",
+    "Les séances durent une heure ou une heure et demie et se réservent en ligne, comme les cours. Les adhérents avec des séances en cours bénéficient de 15 % de réduction.",
+  durations: "1 h ou 1 h 30",
   prestations: [
     {
       name: "Massage sportif",
-      duration: "—",
       price: "—",
       description:
         "Travail en profondeur sur les zones sollicitées à l'entraînement. Pour dénouer, relancer la circulation et récupérer plus vite.",
     },
     {
       name: "Massage détente",
-      duration: "—",
       price: "—",
       description:
         "Pression modérée sur l'ensemble du corps. Pour relâcher les tensions accumulées et faire retomber la pression.",
     },
     {
       name: "Drainage lymphatique",
-      duration: "—",
       price: "—",
       description:
         "Manœuvres lentes et légères qui suivent le trajet de la lymphe. Utilisé pour les jambes lourdes, les sensations de gonflement et la rétention d'eau.",
@@ -133,34 +142,41 @@ export const tarifs = {
   eyebrow: "Tarifs",
   title: "Des séances, pas d'abonnement contraignant",
   intro:
-    "Vous achetez des séances, vous les utilisez quand vous voulez. Le solde est visible à tout moment dans votre espace.",
-  plans: [
-    { name: "Séance à l'unité", price: "—", detail: "À compléter", featured: false },
-    { name: "Carte 10 séances", price: "—", detail: "À compléter", featured: true },
-    { name: "Séance d'essai", price: "—", detail: "À compléter", featured: false },
+    "Vous achetez des séances, vous les utilisez quand vous voulez. Le solde reste visible à tout moment dans votre espace.",
+  lignes: [
+    { name: "Cours collectif", detail: "9 personnes maximum", price: "—" },
+    { name: "Coaching individualisé — solo", detail: "Seul avec le coach", price: "—" },
+    { name: "Coaching individualisé — à deux ou trois", detail: "Par personne", price: "—" },
+    { name: "Massage", detail: "1 h ou 1 h 30", price: "—" },
+    { name: "Consultation d'ostéopathie", detail: "Sur rendez-vous", price: "—" },
   ],
-  footnote: "Tarifs détaillés et moyens de paiement disponibles à l'accueil.",
+  footnote: "Des cartes de séances sont disponibles. Détail et moyens de paiement à l'accueil.",
 };
 
 export const equipe = {
   eyebrow: "L'équipe",
-  title: "Les personnes que vous allez croiser",
-  intro: "À compléter",
+  title: "Vous ne croiserez que deux personnes",
+  intro:
+    "MK Studio, c'est une équipe de deux. Vous savez toujours qui vous allez avoir en face de vous.",
   membres: [
-    { name: "—", role: "Coach", bio: "À compléter" },
-    { name: "—", role: "Ostéopathe D.O.", bio: "À compléter" },
-    { name: "—", role: "Praticien massage", bio: "À compléter" },
+    {
+      name: "Manon Delmas",
+      role: "Coach sportive & masseuse",
+      bio: "À compléter",
+    },
+    {
+      name: "Kevin Thubert",
+      role: "Ostéopathe D.O.",
+      bio: "À compléter",
+    },
   ],
 };
 
 export const avis = {
   eyebrow: "Avis",
   title: "Ce qu'en disent les adhérents",
-  items: [
-    { quote: "À compléter", author: "—", context: "—" },
-    { quote: "À compléter", author: "—", context: "—" },
-    { quote: "À compléter", author: "—", context: "—" },
-  ],
+  /** En attente des avis Google réels — section masquée tant que le tableau est vide. */
+  items: [] as { quote: string; author: string; context: string }[],
 };
 
 export const faq = {
@@ -169,15 +185,19 @@ export const faq = {
   items: [
     {
       q: "Faut-il un niveau particulier pour commencer ?",
-      a: "Non. Les exercices sont adaptés à chacun pendant la séance, y compris en cours collectif.",
+      a: "Non. En coaching individualisé, le programme part de votre niveau. En cours collectif, le coach adapte les exercices pendant la séance.",
     },
     {
-      q: "Comment je réserve un cours ?",
+      q: "Quelle différence entre le coaching à deux ou trois et le cours collectif ?",
+      a: "En coaching à deux ou trois, chacun suit son propre programme : le suivi reste individualisé, vous partagez seulement la salle, ce qui réduit le coût. En cours collectif, le programme est commun au groupe, jusqu'à neuf personnes.",
+    },
+    {
+      q: "Comment je réserve ?",
       a: "Depuis votre espace adhérent, en ligne. Vous voyez le planning, les places restantes et votre solde de séances.",
     },
     {
       q: "Et si j'ai un empêchement ?",
-      a: "L'annulation se fait depuis votre espace, au minimum 24 h avant pour les cours solo et duo. Passé ce délai, la séance est décomptée.",
+      a: "L'annulation se fait depuis votre espace, au minimum 24 h avant pour les séances individualisées. Passé ce délai, la séance est décomptée.",
     },
     {
       q: "Que faut-il apporter ?",
@@ -185,7 +205,7 @@ export const faq = {
     },
     {
       q: "Peut-on venir uniquement pour un massage ou l'ostéopathie ?",
-      a: "Oui. Ces prestations sont ouvertes aux personnes non adhérentes. La réduction de 15 % sur les massages est réservée aux adhérents.",
+      a: "Oui, ces prestations sont ouvertes à tout le monde, adhérent ou non. La réduction de 15 % sur les massages est réservée aux adhérents.",
     },
   ],
 };
@@ -193,12 +213,17 @@ export const faq = {
 export const acces = {
   eyebrow: "Accès",
   title: "Venir à MK Studio",
-  address: ["—", "—"],
-  hours: [
-    { day: "Lundi – Vendredi", value: "—" },
-    { day: "Samedi", value: "—" },
-    { day: "Dimanche", value: "—" },
-  ],
+  address: ["102 route de Gourdon", "46300 Le Vigan-en-Quercy"],
+  rendezVous: {
+    title: "Sur rendez-vous",
+    text: "Coaching individualisé, ostéopathie et massages se réservent au créneau : il n'y a pas d'horaires d'ouverture au sens classique.",
+  },
+  planning: {
+    title: "Cours collectifs",
+    text: "Le planning est fixe d'une semaine à l'autre.",
+    /** En attente du planning réel — le bloc est masqué tant que le tableau est vide. */
+    creneaux: [] as { day: string; slots: string }[],
+  },
   phone: "—",
   email: "—",
   parking: "À compléter",

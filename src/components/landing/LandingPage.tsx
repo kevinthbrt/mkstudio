@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  CalendarDays,
   Check,
   Clock,
   Mail,
@@ -8,9 +9,11 @@ import {
   Phone,
   Quote,
   Sparkles,
+  UserRound,
   Users,
 } from "lucide-react";
 import { LandingNav } from "@/components/landing/LandingNav";
+import { Logo } from "@/components/landing/Logo";
 import { Placeholder } from "@/components/landing/Placeholder";
 import {
   acces,
@@ -129,38 +132,70 @@ export function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-20">
           <SectionHeader eyebrow={coaching.eyebrow} title={coaching.title} intro={coaching.intro} />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {coaching.formats.map((format) => (
-              <article
-                key={format.name}
-                className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white transition-shadow hover:shadow-[0_12px_40px_rgba(20,19,26,0.07)]"
-              >
-                <Placeholder
-                  ratio="16/10"
-                  compact
-                  className="rounded-none border-0 border-b border-dashed"
-                  label={`Illustration — ${format.name}`}
-                />
-                <div className="flex flex-1 flex-col p-6">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="text-lg font-bold text-[#14131A]">{format.name}</h3>
-                    <span className="flex items-center gap-1 text-xs font-medium text-[#8A8470]">
-                      <Clock size={12} />
-                      {format.duration}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-[#55524A]">{format.description}</p>
-                  <ul className="mt-5 space-y-2 border-t border-[#F3F1EB] pt-5">
-                    {format.bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-2 text-sm text-[#55524A]">
-                        <Check size={15} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
+          <div className="mt-12 grid gap-6 lg:grid-cols-2">
+            {/* Coaching individualisé */}
+            <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
+              <Placeholder
+                ratio="16/9"
+                compact
+                className="rounded-none border-0 border-b border-dashed"
+                label="Illustration — coach et adhérent sur un exercice"
+              />
+              <div className="flex flex-1 flex-col p-7">
+                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
+                  <UserRound size={14} />
+                  1 à 3 personnes
+                </span>
+                <h3 className="mt-2 text-xl font-bold text-[#14131A]">
+                  {coaching.individualise.name}
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-[#55524A]">
+                  {coaching.individualise.description}
+                </p>
+
+                <div className="mt-6 grid flex-1 gap-4 sm:grid-cols-2">
+                  {coaching.individualise.options.map((option) => (
+                    <div
+                      key={option.name}
+                      className="rounded-xl border border-[#F0EEE7] bg-[#FBFAF7] p-4"
+                    >
+                      <p className="text-sm font-bold text-[#14131A]">{option.name}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-[#55524A]">
+                        {option.description}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              </article>
-            ))}
+              </div>
+            </article>
+
+            {/* Cours collectifs */}
+            <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
+              <Placeholder
+                ratio="16/9"
+                compact
+                className="rounded-none border-0 border-b border-dashed"
+                label="Illustration — cours collectif en petit groupe"
+              />
+              <div className="flex flex-1 flex-col p-7">
+                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
+                  <Users size={14} />
+                  9 personnes maximum
+                </span>
+                <h3 className="mt-2 text-xl font-bold text-[#14131A]">{coaching.collectif.name}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-[#55524A]">
+                  {coaching.collectif.description}
+                </p>
+                <ul className="mt-6 space-y-2.5 border-t border-[#F3F1EB] pt-5">
+                  {coaching.collectif.bullets.map((bullet) => (
+                    <li key={bullet} className="flex items-start gap-2 text-sm text-[#55524A]">
+                      <Check size={15} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
           </div>
         </div>
       </section>
@@ -179,14 +214,23 @@ export function LandingPage() {
               ))}
             </div>
 
-            <ul className="mt-7 grid gap-2.5 sm:grid-cols-2">
-              {osteopathie.motifs.map((motif) => (
-                <li key={motif} className="flex items-start gap-2 text-sm text-[#55524A]">
-                  <Check size={15} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
-                  {motif}
-                </li>
+            <div className="mt-7 grid gap-6 sm:grid-cols-2">
+              {[osteopathie.pourQui, osteopathie.pourQuoi].map((bloc) => (
+                <div key={bloc.title}>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#14131A]">
+                    {bloc.title}
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {bloc.items.map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-sm text-[#55524A]">
+                        <Check size={15} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
 
             <div className="mt-8 flex items-center gap-4 rounded-2xl border border-[#ECEAE3] bg-white p-4">
               <Placeholder
@@ -240,7 +284,7 @@ export function LandingPage() {
                   <div className="mt-1.5 flex items-center gap-3 text-xs text-[#8A8470]">
                     <span className="flex items-center gap-1">
                       <Clock size={12} />
-                      {p.duration}
+                      {massages.durations}
                     </span>
                     <span className="font-semibold text-[#8A7A34]">{p.price}</span>
                   </div>
@@ -259,47 +303,52 @@ export function LandingPage() {
 
       {/* -------------------------------------------------------------- Tarifs */}
       <section id="tarifs" className="scroll-mt-20 border-b border-[#ECEAE3] bg-[#FBFAF7]">
-        <div className="mx-auto max-w-6xl px-5 py-20">
+        <div className="mx-auto max-w-3xl px-5 py-20">
           <SectionHeader eyebrow={tarifs.eyebrow} title={tarifs.title} intro={tarifs.intro} center />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {tarifs.plans.map((plan) => (
+          <div className="mt-12 overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
+            {tarifs.lignes.map((ligne) => (
               <div
-                key={plan.name}
-                className={
-                  plan.featured
-                    ? "rounded-2xl border-2 border-[#C9A227] bg-white p-7 shadow-[0_12px_40px_rgba(201,162,39,0.14)]"
-                    : "rounded-2xl border border-[#ECEAE3] bg-white p-7"
-                }
+                key={ligne.name}
+                className="flex items-center justify-between gap-6 border-b border-[#F3F1EB] px-6 py-5 last:border-0"
               >
-                {plan.featured && (
-                  <span className="mb-3 inline-block rounded-full bg-[#FBF4DE] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#8A7A34]">
-                    Le plus choisi
-                  </span>
-                )}
-                <h3 className="text-base font-bold text-[#14131A]">{plan.name}</h3>
-                <p className="mt-3 text-3xl font-bold tracking-tight text-[#14131A]">{plan.price}</p>
-                <p className="mt-2 text-sm text-[#55524A]">{plan.detail}</p>
+                <div>
+                  <p className="text-sm font-semibold text-[#14131A]">{ligne.name}</p>
+                  <p className="mt-0.5 text-sm text-[#8A8470]">{ligne.detail}</p>
+                </div>
+                <p className="flex-shrink-0 text-lg font-bold text-[#14131A]">{ligne.price}</p>
               </div>
             ))}
           </div>
 
-          <p className="mt-8 text-center text-sm text-[#8A8470]">{tarifs.footnote}</p>
+          <p className="mt-6 text-center text-sm text-[#8A8470]">{tarifs.footnote}</p>
         </div>
       </section>
 
       {/* -------------------------------------------------------------- Équipe */}
       <section id="equipe" className="scroll-mt-20 border-b border-[#ECEAE3] bg-white">
-        <div className="mx-auto max-w-6xl px-5 py-20">
-          <SectionHeader eyebrow={equipe.eyebrow} title={equipe.title} intro={equipe.intro} />
+        <div className="mx-auto max-w-5xl px-5 py-20">
+          <SectionHeader eyebrow={equipe.eyebrow} title={equipe.title} intro={equipe.intro} center />
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {equipe.membres.map((m, i) => (
-              <div key={`${m.role}-${i}`} className="rounded-2xl border border-[#ECEAE3] bg-white p-5">
-                <Placeholder ratio="1/1" compact label="Portrait" className="mb-4" />
-                <p className="text-base font-bold text-[#14131A]">{m.name}</p>
-                <p className="text-xs font-medium uppercase tracking-wider text-[#C9A227]">{m.role}</p>
-                <p className="mt-3 text-sm leading-relaxed text-[#55524A]">{m.bio}</p>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2">
+            {equipe.membres.map((m) => (
+              <div
+                key={m.name}
+                className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white sm:flex-row"
+              >
+                <Placeholder
+                  ratio="1/1"
+                  compact
+                  className="rounded-none border-0 sm:w-40 sm:flex-shrink-0 sm:border-r sm:border-dashed"
+                  label="Portrait"
+                />
+                <div className="p-6">
+                  <p className="text-lg font-bold text-[#14131A]">{m.name}</p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-[#C9A227]">
+                    {m.role}
+                  </p>
+                  <p className="mt-3 text-sm leading-relaxed text-[#55524A]">{m.bio}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -307,29 +356,28 @@ export function LandingPage() {
       </section>
 
       {/* ---------------------------------------------------------------- Avis */}
-      <section className="border-b border-[#ECEAE3] bg-[#FBFAF7]">
-        <div className="mx-auto max-w-6xl px-5 py-20">
-          <SectionHeader eyebrow={avis.eyebrow} title={avis.title} center />
+      {avis.items.length > 0 && (
+        <section className="border-b border-[#ECEAE3] bg-[#FBFAF7]">
+          <div className="mx-auto max-w-6xl px-5 py-20">
+            <SectionHeader eyebrow={avis.eyebrow} title={avis.title} center />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {avis.items.map((item, i) => (
-              <figure key={i} className="rounded-2xl border border-[#ECEAE3] bg-white p-6">
-                <Quote size={20} className="text-[#C9A227]" />
-                <blockquote className="mt-4 text-sm leading-relaxed text-[#3A3830]">
-                  {item.quote}
-                </blockquote>
-                <figcaption className="mt-5 flex items-center gap-3 border-t border-[#F3F1EB] pt-4">
-                  <Placeholder ratio="1/1" compact className="h-10 w-10 rounded-full" label="" />
-                  <div>
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {avis.items.map((item, i) => (
+                <figure key={i} className="rounded-2xl border border-[#ECEAE3] bg-white p-6">
+                  <Quote size={20} className="text-[#C9A227]" />
+                  <blockquote className="mt-4 text-sm leading-relaxed text-[#3A3830]">
+                    {item.quote}
+                  </blockquote>
+                  <figcaption className="mt-5 border-t border-[#F3F1EB] pt-4">
                     <p className="text-sm font-semibold text-[#14131A]">{item.author}</p>
                     <p className="text-xs text-[#8A8470]">{item.context}</p>
-                  </div>
-                </figcaption>
-              </figure>
-            ))}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ----------------------------------------------------------------- FAQ */}
       <section id="faq" className="scroll-mt-20 border-b border-[#ECEAE3] bg-white">
@@ -358,12 +406,14 @@ export function LandingPage() {
           <div>
             <SectionHeader eyebrow={acces.eyebrow} title={acces.title} />
 
-            <div className="mt-8 space-y-6">
+            <div className="mt-8 space-y-7">
               <div className="flex gap-3">
                 <MapPin size={18} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
                 <div className="text-sm text-[#55524A]">
                   {acces.address.map((line, i) => (
-                    <p key={i}>{line}</p>
+                    <p key={i} className={i === 0 ? "font-medium text-[#14131A]" : undefined}>
+                      {line}
+                    </p>
                   ))}
                   <p className="mt-1 text-[#8A8470]">{acces.parking}</p>
                 </div>
@@ -371,13 +421,30 @@ export function LandingPage() {
 
               <div className="flex gap-3">
                 <Clock size={18} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
-                <div className="w-full max-w-sm text-sm text-[#55524A]">
-                  {acces.hours.map((h) => (
-                    <div key={h.day} className="flex justify-between gap-4 border-b border-[#EFEDE5] py-1.5 last:border-0">
-                      <span>{h.day}</span>
-                      <span className="font-medium text-[#14131A]">{h.value}</span>
+                <div className="text-sm text-[#55524A]">
+                  <p className="font-medium text-[#14131A]">{acces.rendezVous.title}</p>
+                  <p className="mt-1 max-w-md leading-relaxed">{acces.rendezVous.text}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <CalendarDays size={18} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
+                <div className="w-full max-w-md text-sm text-[#55524A]">
+                  <p className="font-medium text-[#14131A]">{acces.planning.title}</p>
+                  <p className="mt-1 leading-relaxed">{acces.planning.text}</p>
+                  {acces.planning.creneaux.length > 0 && (
+                    <div className="mt-3">
+                      {acces.planning.creneaux.map((c) => (
+                        <div
+                          key={c.day}
+                          className="flex justify-between gap-4 border-b border-[#EFEDE5] py-1.5 last:border-0"
+                        >
+                          <span>{c.day}</span>
+                          <span className="font-medium text-[#14131A]">{c.slots}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -438,9 +505,7 @@ export function LandingPage() {
       <footer className="border-t border-[#ECEAE3] bg-[#FBFAF7]">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#E8C84A] via-[#D4AF37] to-[#B8941E] text-sm font-black text-[#14131A]">
-              MK
-            </span>
+            <Logo size={38} />
             <div>
               <p className="text-sm font-bold text-[#14131A]">MK Studio</p>
               <p className="text-xs text-[#8A8470]">{footer.tagline}</p>
