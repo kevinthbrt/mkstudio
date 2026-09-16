@@ -4,7 +4,6 @@ import {
   CalendarDays,
   Check,
   Clock,
-  Mail,
   MapPin,
   Phone,
   Quote,
@@ -139,12 +138,12 @@ export function LandingPage() {
                 ratio="16/9"
                 compact
                 className="rounded-none border-0 border-b border-dashed"
-                label="Illustration — coach et adhérent sur un exercice"
+                label="Illustration : coach et adhérent sur un exercice"
               />
               <div className="flex flex-1 flex-col p-7">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
                   <UserRound size={14} />
-                  1 à 3 personnes
+                  {coaching.individualise.tag}
                 </span>
                 <h3 className="mt-2 text-xl font-bold text-[#14131A]">
                   {coaching.individualise.name}
@@ -175,12 +174,12 @@ export function LandingPage() {
                 ratio="16/9"
                 compact
                 className="rounded-none border-0 border-b border-dashed"
-                label="Illustration — cours collectif en petit groupe"
+                label="Illustration : cours collectif en petit groupe"
               />
               <div className="flex flex-1 flex-col p-7">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
                   <Users size={14} />
-                  9 personnes maximum
+                  {coaching.collectif.tag}
                 </span>
                 <h3 className="mt-2 text-xl font-bold text-[#14131A]">{coaching.collectif.name}</h3>
                 <p className="mt-3 text-sm leading-relaxed text-[#55524A]">
@@ -196,6 +195,41 @@ export function LandingPage() {
                 </ul>
               </div>
             </article>
+          </div>
+
+          {/* Planning des cours collectifs */}
+          <div className="mt-8 overflow-hidden rounded-2xl border border-[#ECEAE3] bg-[#FBFAF7]">
+            <div className="border-b border-[#ECEAE3] px-6 py-5">
+              <h3 className="flex items-center gap-2 text-base font-bold text-[#14131A]">
+                <CalendarDays size={17} className="text-[#C9A227]" />
+                {coaching.planning.title}
+              </h3>
+              <p className="mt-1 text-sm text-[#55524A]">{coaching.planning.intro}</p>
+            </div>
+            <div className="grid divide-y divide-[#ECEAE3] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3">
+              {coaching.planning.jours.map((jour) => (
+                <div key={jour.day} className="border-[#ECEAE3] p-5 sm:border-b sm:border-r">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#8A8470]">
+                    {jour.day}
+                  </p>
+                  <ul className="mt-3 space-y-2.5">
+                    {jour.cours.map((cours) => (
+                      <li key={`${jour.day}-${cours.time}`} className="flex gap-3">
+                        <span className="w-12 flex-shrink-0 text-sm font-bold text-[#C9A227]">
+                          {cours.time}
+                        </span>
+                        <span className="text-sm text-[#14131A]">
+                          {cours.name}
+                          {"detail" in cours && cours.detail && (
+                            <span className="block text-xs text-[#8A8470]">{cours.detail}</span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -246,13 +280,14 @@ export function LandingPage() {
               </div>
             </div>
 
-            <Link
-              href="/register"
+            <a
+              href={osteopathie.ctaHref}
               className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#14131A] px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2A2823]"
             >
               {osteopathie.cta}
               <ArrowRight size={16} />
-            </Link>
+            </a>
+            <p className="mt-3 text-sm text-[#8A8470]">{osteopathie.ctaNote}</p>
           </div>
         </div>
       </section>
@@ -277,14 +312,14 @@ export function LandingPage() {
                   ratio="16/10"
                   compact
                   className="rounded-none border-0 border-b border-dashed"
-                  label={`Illustration — ${p.name}`}
+                  label={`Illustration : ${p.name}`}
                 />
                 <div className="flex flex-1 flex-col p-6">
                   <h3 className="text-lg font-bold text-[#14131A]">{p.name}</h3>
                   <div className="mt-1.5 flex items-center gap-3 text-xs text-[#8A8470]">
                     <span className="flex items-center gap-1">
                       <Clock size={12} />
-                      {massages.durations}
+                      {p.duration}
                     </span>
                     <span className="font-semibold text-[#8A7A34]">{p.price}</span>
                   </div>
@@ -303,25 +338,39 @@ export function LandingPage() {
 
       {/* -------------------------------------------------------------- Tarifs */}
       <section id="tarifs" className="scroll-mt-20 border-b border-[#ECEAE3] bg-[#FBFAF7]">
-        <div className="mx-auto max-w-3xl px-5 py-20">
+        <div className="mx-auto max-w-5xl px-5 py-20">
           <SectionHeader eyebrow={tarifs.eyebrow} title={tarifs.title} intro={tarifs.intro} center />
 
-          <div className="mt-12 overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
-            {tarifs.lignes.map((ligne) => (
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {tarifs.groupes.map((groupe) => (
               <div
-                key={ligne.name}
-                className="flex items-center justify-between gap-6 border-b border-[#F3F1EB] px-6 py-5 last:border-0"
+                key={groupe.title}
+                className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white"
               >
-                <div>
-                  <p className="text-sm font-semibold text-[#14131A]">{ligne.name}</p>
-                  <p className="mt-0.5 text-sm text-[#8A8470]">{ligne.detail}</p>
+                <h3 className="border-b border-[#F3F1EB] px-6 py-4 text-sm font-bold uppercase tracking-wider text-[#14131A]">
+                  {groupe.title}
+                </h3>
+                <div className="flex-1 px-6 py-2">
+                  {groupe.lignes.map((ligne) => (
+                    <div
+                      key={ligne.name}
+                      className="flex items-baseline justify-between gap-4 border-b border-[#F7F5F0] py-3 last:border-0"
+                    >
+                      <span className="text-sm text-[#55524A]">{ligne.name}</span>
+                      <span className="flex-shrink-0 text-base font-bold text-[#14131A]">
+                        {ligne.price}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <p className="flex-shrink-0 text-lg font-bold text-[#14131A]">{ligne.price}</p>
+                {"note" in groupe && groupe.note && (
+                  <p className="border-t border-[#F3F1EB] bg-[#FDFCF8] px-6 py-3 text-xs text-[#8A7A34]">
+                    {groupe.note}
+                  </p>
+                )}
               </div>
             ))}
           </div>
-
-          <p className="mt-6 text-center text-sm text-[#8A8470]">{tarifs.footnote}</p>
         </div>
       </section>
 
@@ -428,35 +477,22 @@ export function LandingPage() {
               </div>
 
               <div className="flex gap-3">
-                <CalendarDays size={18} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
-                <div className="w-full max-w-md text-sm text-[#55524A]">
-                  <p className="font-medium text-[#14131A]">{acces.planning.title}</p>
-                  <p className="mt-1 leading-relaxed">{acces.planning.text}</p>
-                  {acces.planning.creneaux.length > 0 && (
-                    <div className="mt-3">
-                      {acces.planning.creneaux.map((c) => (
-                        <div
-                          key={c.day}
-                          className="flex justify-between gap-4 border-b border-[#EFEDE5] py-1.5 last:border-0"
-                        >
-                          <span>{c.day}</span>
-                          <span className="font-medium text-[#14131A]">{c.slots}</span>
-                        </div>
-                      ))}
+                <Phone size={18} className="mt-0.5 flex-shrink-0 text-[#C9A227]" />
+                <div className="space-y-2.5">
+                  {acces.contacts.map((contact) => (
+                    <div key={contact.value}>
+                      <p className="text-xs uppercase tracking-wider text-[#8A8470]">
+                        {contact.label}
+                      </p>
+                      <a
+                        href={contact.href}
+                        className="text-sm font-semibold text-[#14131A] hover:text-[#8A7A34]"
+                      >
+                        {contact.value}
+                      </a>
                     </div>
-                  )}
+                  ))}
                 </div>
-              </div>
-
-              <div className="flex flex-wrap gap-6">
-                <a href={`tel:${acces.phone}`} className="flex items-center gap-2 text-sm font-medium text-[#14131A]">
-                  <Phone size={16} className="text-[#C9A227]" />
-                  {acces.phone}
-                </a>
-                <a href={`mailto:${acces.email}`} className="flex items-center gap-2 text-sm font-medium text-[#14131A]">
-                  <Mail size={16} className="text-[#C9A227]" />
-                  {acces.email}
-                </a>
               </div>
             </div>
           </div>

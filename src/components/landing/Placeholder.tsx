@@ -2,7 +2,7 @@ import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PlaceholderProps {
-  /** Ce que la photo devra montrer — sert de brief au photographe. */
+  /** Ce que la photo devra montrer : sert de brief au photographe. */
   label: string;
   /** Ratio CSS, ex. "4/3", "16/9", "1/1". */
   ratio?: string;
