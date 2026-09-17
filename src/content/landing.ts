@@ -165,6 +165,7 @@ export const massages = {
   prestations: [
     {
       name: "Massage californien",
+      photo: "massage-californien",
       duration: "30 min, 1 h ou 1 h 30",
       price: "à partir de 40 €",
       description:
@@ -172,6 +173,7 @@ export const massages = {
     },
     {
       name: "Massage ayurvédique",
+      photo: "massage-ayurvedique",
       duration: "30 min, 1 h ou 1 h 30",
       price: "à partir de 40 €",
       description:
@@ -179,6 +181,7 @@ export const massages = {
     },
     {
       name: "Drainage lymphatique",
+      photo: "drainage-lymphatique",
       duration: "Séance ou pack de 6",
       price: "75 €",
       description:
@@ -241,10 +244,12 @@ export const equipe = {
   membres: [
     {
       name: "Manon Delmas",
+      photo: "portrait-manon",
       role: "Coach sportive & masseuse",
     },
     {
       name: "Kevin Thubert",
+      photo: "portrait-kevin",
       role: "Ostéopathe D.O.",
     },
   ],

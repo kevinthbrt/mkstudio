@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Logo } from "@/components/landing/Logo";
-import { Placeholder } from "@/components/landing/Placeholder";
+import { Illustration } from "@/components/landing/Illustration";
 import {
   acces,
   avis,
@@ -101,13 +101,28 @@ export function LandingPage() {
           </div>
 
           <div className="grid gap-4">
-            <Placeholder
+            <Illustration
+              name="salle"
               ratio="4/3"
+              priority
+              sizes="(max-width: 1024px) 100vw, 45vw"
               label="Photo principale : vue d'ensemble de la salle, lumière naturelle"
             />
             <div className="grid grid-cols-2 gap-4">
-              <Placeholder ratio="1/1" compact label="Coach pendant un cours collectif" />
-              <Placeholder ratio="1/1" compact label="Espace massage / table de soin" />
+              <Illustration
+                name="coach-cours-collectif"
+                ratio="1/1"
+                compact
+                sizes="(max-width: 1024px) 50vw, 22vw"
+                label="Coach pendant un cours collectif"
+              />
+              <Illustration
+                name="espace-massage"
+                ratio="1/1"
+                compact
+                sizes="(max-width: 1024px) 50vw, 22vw"
+                label="Espace massage et table de soin"
+              />
             </div>
           </div>
         </div>
@@ -134,11 +149,12 @@ export function LandingPage() {
           <div className="mt-12 grid gap-6 lg:grid-cols-2">
             {/* Coaching individualisé */}
             <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
-              <Placeholder
+              <Illustration
+                name="coaching-individualise"
                 ratio="16/9"
                 compact
-                className="rounded-none border-0 border-b border-dashed"
-                label="Illustration : coach et adhérent sur un exercice"
+                className="rounded-none"
+                label="Coach et adhérent sur un exercice"
               />
               <div className="flex flex-1 flex-col p-7">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
@@ -170,11 +186,12 @@ export function LandingPage() {
 
             {/* Cours collectifs */}
             <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
-              <Placeholder
+              <Illustration
+                name="cours-collectif"
                 ratio="16/9"
                 compact
-                className="rounded-none border-0 border-b border-dashed"
-                label="Illustration : cours collectif en petit groupe"
+                className="rounded-none"
+                label="Cours collectif en petit groupe"
               />
               <div className="flex flex-1 flex-col p-7">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9A227]">
@@ -237,7 +254,12 @@ export function LandingPage() {
       {/* --------------------------------------------------------- Ostéopathie */}
       <section id="osteopathie" className="scroll-mt-20 border-b border-[#ECEAE3] bg-[#FBFAF7]">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 lg:grid-cols-2">
-          <Placeholder ratio="4/3" label="Cabinet d'ostéopathie : table de consultation, ambiance calme" />
+          <Illustration
+            name="cabinet-osteopathie"
+            ratio="4/3"
+            sizes="(max-width: 1024px) 100vw, 45vw"
+            label="Cabinet d'ostéopathie : table de consultation, ambiance calme"
+          />
           <div>
             <SectionHeader eyebrow={osteopathie.eyebrow} title={osteopathie.title} />
             <div className="mt-5 space-y-4">
@@ -267,11 +289,13 @@ export function LandingPage() {
             </div>
 
             <div className="mt-8 flex items-center gap-4 rounded-2xl border border-[#ECEAE3] bg-white p-4">
-              <Placeholder
+              <Illustration
+                name="portrait-kevin"
                 ratio="1/1"
                 compact
+                sizes="64px"
                 className="h-16 w-16 flex-shrink-0 rounded-full"
-                label="Portrait"
+                label="Portrait de Kevin Thubert"
               />
               <div>
                 <p className="text-sm font-bold text-[#14131A]">{osteopathie.practitioner.name}</p>
@@ -309,11 +333,13 @@ export function LandingPage() {
                 key={p.name}
                 className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white transition-shadow hover:shadow-[0_12px_40px_rgba(20,19,26,0.07)]"
               >
-                <Placeholder
+                <Illustration
+                  name={p.photo}
                   ratio="16/10"
                   compact
-                  className="rounded-none border-0 border-b border-dashed"
-                  label={`Illustration : ${p.name}`}
+                  className="rounded-none"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  label={p.name}
                 />
                 <div className="flex flex-1 flex-col p-6">
                   <h3 className="text-lg font-bold text-[#14131A]">{p.name}</h3>
@@ -386,11 +412,13 @@ export function LandingPage() {
                 key={m.name}
                 className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white sm:flex-row"
               >
-                <Placeholder
+                <Illustration
+                  name={m.photo}
                   ratio="1/1"
                   compact
-                  className="rounded-none border-0 sm:w-40 sm:flex-shrink-0 sm:border-r sm:border-dashed"
-                  label="Portrait"
+                  sizes="(max-width: 640px) 100vw, 160px"
+                  className="rounded-none sm:w-40 sm:flex-shrink-0"
+                  label={`Portrait de ${m.name}`}
                 />
                 <div className="flex flex-col justify-center p-6">
                   <p className="text-lg font-bold text-[#14131A]">{m.name}</p>
@@ -497,7 +525,12 @@ export function LandingPage() {
             </div>
           </div>
 
-          <Placeholder ratio="4/3" label="Carte ou photo de la façade / entrée de la salle" />
+          <Illustration
+            name="facade"
+            ratio="4/3"
+            sizes="(max-width: 1024px) 100vw, 45vw"
+            label="Façade et entrée de la salle"
+          />
         </div>
       </section>
 

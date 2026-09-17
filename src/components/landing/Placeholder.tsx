@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 interface PlaceholderProps {
   /** Ce que la photo devra montrer : sert de brief au photographe. */
   label: string;
+  /** Nom de fichier attendu dans public/photos/, affiché dans le cadre. */
+  fileName?: string;
   /** Ratio CSS, ex. "4/3", "16/9", "1/1". */
   ratio?: string;
   className?: string;
@@ -12,10 +14,11 @@ interface PlaceholderProps {
 }
 
 /**
- * Emplacement réservé pour une illustration/photo à venir.
- * À remplacer par <Image /> quand les visuels de la salle seront disponibles.
+ * Emplacement réservé pour une photo à venir.
+ * Dès qu'un fichier du bon nom est déposé dans public/photos/,
+ * <Illustration /> affiche la photo à la place de ce cadre.
  */
-export function Placeholder({ label, ratio = "4/3", className, compact }: PlaceholderProps) {
+export function Placeholder({ label, fileName, ratio = "4/3", className, compact }: PlaceholderProps) {
   return (
     <div
       style={{ aspectRatio: ratio }}
@@ -37,14 +40,26 @@ export function Placeholder({ label, ratio = "4/3", className, compact }: Placeh
       <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#C9A227] shadow-sm">
         <ImageIcon size={16} />
       </div>
-      <p
-        className={cn(
-          "relative max-w-[26ch] font-medium leading-snug text-[#8A8470]",
-          compact ? "text-[11px]" : "text-xs"
-        )}
-      >
-        {label}
-      </p>
+      {label && (
+        <p
+          className={cn(
+            "relative max-w-[26ch] font-medium leading-snug text-[#8A8470]",
+            compact ? "text-[11px]" : "text-xs"
+          )}
+        >
+          {label}
+        </p>
+      )}
+      {fileName && (
+        <code
+          className={cn(
+            "relative rounded-md bg-white px-2 py-0.5 font-mono text-[#A39A7C] shadow-sm",
+            compact ? "text-[9px]" : "text-[10px]"
+          )}
+        >
+          {fileName}.jpg
+        </code>
+      )}
     </div>
   );
 }
