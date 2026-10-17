@@ -87,42 +87,56 @@ export const coaching = {
   planning: {
     title: "Le planning des cours collectifs",
     intro: "Il est fixe d'une semaine à l'autre. La réservation est nécessaire pour participer.",
+    cta: "Réserver un cours",
+    /** Une couleur par discipline, reprise dans la légende. */
+    disciplines: [
+      { kind: "cross", label: "Cross training" },
+      { kind: "pilates", label: "Pilates" },
+      { kind: "renfo", label: "Renforcement" },
+      { kind: "seniors", label: "Seniors" },
+    ],
     jours: [
       {
         day: "Lundi",
+        short: "Lun",
         cours: [
-          { time: "18h30", name: "Cross training" },
-          { time: "19h30", name: "Renfo / abdos" },
+          { time: "18h30", name: "Cross training", kind: "cross" },
+          { time: "19h30", name: "Renfo / abdos", kind: "renfo" },
         ],
       },
       {
         day: "Mardi",
+        short: "Mar",
         cours: [
-          { time: "17h40", name: "Pilates" },
-          { time: "18h40", name: "Pilates" },
+          { time: "17h40", name: "Pilates", kind: "pilates" },
+          { time: "18h40", name: "Pilates", kind: "pilates" },
         ],
       },
       {
         day: "Mercredi",
+        short: "Mer",
         cours: [
-          { time: "10h30", name: "Pilates" },
-          { time: "19h00", name: "Cross training" },
+          { time: "10h30", name: "Pilates", kind: "pilates" },
+          { time: "19h00", name: "Cross training", kind: "cross" },
         ],
       },
       {
         day: "Jeudi",
+        short: "Jeu",
         cours: [
-          { time: "09h45", name: "Seniors", detail: "Équilibre, mobilité et souplesse" },
-          { time: "17h30", name: "Fessiers / abdos", detail: "45 min" },
+          { time: "09h45", name: "Seniors", kind: "seniors", detail: "Équilibre, mobilité et souplesse" },
+          { time: "17h30", name: "Fessiers / abdos", kind: "renfo", detail: "45 min" },
         ],
       },
       {
         day: "Vendredi",
-        cours: [{ time: "12h15", name: "Cross training", detail: "45 min" }],
+        short: "Ven",
+        cours: [{ time: "12h15", name: "Cross training", kind: "cross", detail: "45 min" }],
       },
       {
         day: "Samedi",
-        cours: [{ time: "10h30", name: "Renfo / abdos / stretching" }],
+        short: "Sam",
+        cours: [{ time: "10h30", name: "Renfo / abdos / stretching", kind: "renfo" }],
       },
     ],
   },

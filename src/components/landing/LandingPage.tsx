@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  CalendarDays,
   Droplets,
   Dumbbell,
   Flower2,
@@ -19,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { LandingNav } from "@/components/landing/LandingNav";
+import { PlanningWeek } from "@/components/landing/PlanningWeek";
 import { Logo } from "@/components/landing/Logo";
 import { Illustration } from "@/components/landing/Illustration";
 import { IconVisual, InitialsVisual, LogoVisual, MapVisual } from "@/components/landing/Visuals";
@@ -229,40 +229,7 @@ export function LandingPage() {
             </article>
           </div>
 
-          {/* Planning des cours collectifs */}
-          <div className="mt-8 overflow-hidden rounded-2xl border border-[#ECEAE3] bg-[#FBFAF7]">
-            <div className="border-b border-[#ECEAE3] px-6 py-5">
-              <h3 className="flex items-center gap-2 text-base font-bold text-[#14131A]">
-                <CalendarDays size={17} className="text-[#C9A227]" />
-                {coaching.planning.title}
-              </h3>
-              <p className="mt-1 text-sm text-[#55524A]">{coaching.planning.intro}</p>
-            </div>
-            <div className="grid divide-y divide-[#ECEAE3] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3">
-              {coaching.planning.jours.map((jour) => (
-                <div key={jour.day} className="border-[#ECEAE3] p-5 sm:border-b sm:border-r">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#8A8470]">
-                    {jour.day}
-                  </p>
-                  <ul className="mt-3 space-y-2.5">
-                    {jour.cours.map((cours) => (
-                      <li key={`${jour.day}-${cours.time}`} className="flex gap-3">
-                        <span className="w-12 flex-shrink-0 text-sm font-bold text-[#C9A227]">
-                          {cours.time}
-                        </span>
-                        <span className="text-sm text-[#14131A]">
-                          {cours.name}
-                          {"detail" in cours && cours.detail && (
-                            <span className="block text-xs text-[#8A8470]">{cours.detail}</span>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PlanningWeek />
         </div>
       </section>
 
