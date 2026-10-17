@@ -297,6 +297,8 @@ export const acces = {
   eyebrow: "Accès",
   title: "Venir à MK Studio",
   address: ["102 route de Gourdon", "46300 Le Vigan en Quercy"],
+  mapsUrl:
+    "https://www.google.com/maps/search/?api=1&query=MK+Studio+102+route+de+Gourdon+46300+Le+Vigan",
   rendezVous: {
     title: "Sur rendez-vous",
     text: "Coaching individualisé, ostéopathie et massages se réservent au créneau : il n'y a pas d'horaires d'ouverture au sens classique. Les cours collectifs suivent un planning fixe.",

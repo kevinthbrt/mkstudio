@@ -2,6 +2,11 @@ import Link from "next/link";
 import {
   ArrowRight,
   CalendarDays,
+  Droplets,
+  Dumbbell,
+  Flower2,
+  Hand,
+  HandHeart,
   Check,
   Clock,
   MapPin,
@@ -10,10 +15,13 @@ import {
   Sparkles,
   UserRound,
   Users,
+  Waves,
+  type LucideIcon,
 } from "lucide-react";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Logo } from "@/components/landing/Logo";
 import { Illustration } from "@/components/landing/Illustration";
+import { IconVisual, InitialsVisual, LogoVisual, MapVisual } from "@/components/landing/Visuals";
 import {
   acces,
   avis,
@@ -28,6 +36,12 @@ import {
   osteopathie,
   tarifs,
 } from "@/content/landing";
+
+const MASSAGE_ICONS: Record<string, LucideIcon> = {
+  "massage-californien": Waves,
+  "massage-ayurvedique": Flower2,
+  "drainage-lymphatique": Droplets,
+};
 
 function SectionHeader({
   eyebrow,
@@ -103,6 +117,7 @@ export function LandingPage() {
           <div className="grid gap-4">
             <Illustration
               name="salle"
+              fallback={<LogoVisual />}
               ratio="4/3"
               priority
               sizes="(max-width: 1024px) 100vw, 45vw"
@@ -111,15 +126,15 @@ export function LandingPage() {
             <div className="grid grid-cols-2 gap-4">
               <Illustration
                 name="coach-cours-collectif"
+                fallback={<IconVisual icon={Dumbbell} caption="Coaching" />}
                 ratio="1/1"
-                compact
                 sizes="(max-width: 1024px) 50vw, 22vw"
                 label="Coach pendant un cours collectif"
               />
               <Illustration
                 name="espace-massage"
+                fallback={<IconVisual icon={HandHeart} caption="Soins" dark />}
                 ratio="1/1"
-                compact
                 sizes="(max-width: 1024px) 50vw, 22vw"
                 label="Espace massage et table de soin"
               />
@@ -151,8 +166,8 @@ export function LandingPage() {
             <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
               <Illustration
                 name="coaching-individualise"
+                fallback={<IconVisual icon={UserRound} size="lg" />}
                 ratio="16/9"
-                compact
                 className="rounded-none"
                 label="Coach et adhérent sur un exercice"
               />
@@ -188,8 +203,8 @@ export function LandingPage() {
             <article className="flex flex-col overflow-hidden rounded-2xl border border-[#ECEAE3] bg-white">
               <Illustration
                 name="cours-collectif"
+                fallback={<IconVisual icon={Users} size="lg" />}
                 ratio="16/9"
-                compact
                 className="rounded-none"
                 label="Cours collectif en petit groupe"
               />
@@ -256,6 +271,7 @@ export function LandingPage() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 lg:grid-cols-2">
           <Illustration
             name="cabinet-osteopathie"
+            fallback={<IconVisual icon={Hand} caption="Ostéopathie" size="lg" dark />}
             ratio="4/3"
             sizes="(max-width: 1024px) 100vw, 45vw"
             label="Cabinet d'ostéopathie : table de consultation, ambiance calme"
@@ -291,8 +307,8 @@ export function LandingPage() {
             <div className="mt-8 flex items-center gap-4 rounded-2xl border border-[#ECEAE3] bg-white p-4">
               <Illustration
                 name="portrait-kevin"
+                fallback={<InitialsVisual name="Kevin Thubert" small />}
                 ratio="1/1"
-                compact
                 sizes="64px"
                 className="h-16 w-16 flex-shrink-0 rounded-full"
                 label="Portrait de Kevin Thubert"
@@ -335,8 +351,8 @@ export function LandingPage() {
               >
                 <Illustration
                   name={p.photo}
+                  fallback={<IconVisual icon={MASSAGE_ICONS[p.photo] ?? HandHeart} size="lg" />}
                   ratio="16/10"
-                  compact
                   className="rounded-none"
                   sizes="(max-width: 768px) 100vw, 33vw"
                   label={p.name}
@@ -414,8 +430,8 @@ export function LandingPage() {
               >
                 <Illustration
                   name={m.photo}
+                  fallback={<InitialsVisual name={m.name} />}
                   ratio="1/1"
-                  compact
                   sizes="(max-width: 640px) 100vw, 160px"
                   className="rounded-none sm:w-40 sm:flex-shrink-0"
                   label={`Portrait de ${m.name}`}
@@ -527,6 +543,7 @@ export function LandingPage() {
 
           <Illustration
             name="facade"
+            fallback={<MapVisual lines={acces.address} href={acces.mapsUrl} />}
             ratio="4/3"
             sizes="(max-width: 1024px) 100vw, 45vw"
             label="Façade et entrée de la salle"
