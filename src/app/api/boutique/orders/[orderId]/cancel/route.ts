@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdmins } from "@/lib/notifyMember";
 import { merchErrorMessage } from "@/lib/merch";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   _request: NextRequest,
@@ -39,10 +39,12 @@ export async function POST(
     .eq("id", orderId)
     .single();
 
-  notifyAdmins(
-    "Commande boutique annulée",
-    `${profile.first_name} ${profile.last_name ?? ""}`.trim() + " a annulé sa commande.",
-    order ? `/admin/boutique/${order.sale_id}` : "/admin/boutique"
+  after(() =>
+    notifyAdmins(
+      "Commande boutique annulée",
+      `${profile.first_name} ${profile.last_name ?? ""}`.trim() + " a annulé sa commande.",
+      order ? `/admin/boutique/${order.sale_id}` : "/admin/boutique"
+    )
   );
 
   return NextResponse.json({ success: true });

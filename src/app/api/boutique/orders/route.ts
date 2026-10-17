@@ -4,7 +4,7 @@ import { sendMerchOrderConfirmationEmail } from "@/lib/email";
 import { notifyAdmins } from "@/lib/notifyMember";
 import { merchErrorMessage, merchPaymentLabel } from "@/lib/merch";
 import { formatPriceFromEuros } from "@/lib/utils";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 interface OrderLineInput {
   item_id: string;
@@ -63,30 +63,38 @@ export async function POST(request: NextRequest) {
 
   const total = Number(rpcResult.total ?? 0);
 
-  if (profile.email && sale) {
-    sendMerchOrderConfirmationEmail({
-      to: profile.email,
-      firstName: profile.first_name ?? "",
-      saleTitle: sale.title,
-      closesAt: sale.closes_at,
-      lines: (orderLines ?? []).map((line) => ({
-        itemName: line.item_name,
-        variant: line.variant,
-        quantity: line.quantity,
-        unitPrice: Number(line.unit_price),
-      })),
-      total,
-      paymentLabel: merchPaymentLabel(paymentMethod),
-      paymentInstructions: sale.payment_instructions,
-    }).catch((err) => console.error("[boutique/orders] email error:", err));
-  }
+  // after() : l'email et la notification partent après la réponse, sans que
+  // Vercel ne coupe la fonction au milieu de l'envoi.
+  after(async () => {
+    if (profile.email && sale) {
+      const result = await sendMerchOrderConfirmationEmail({
+        to: profile.email,
+        firstName: profile.first_name ?? "",
+        saleTitle: sale.title,
+        closesAt: sale.closes_at,
+        lines: (orderLines ?? []).map((line) => ({
+          itemName: line.item_name,
+          variant: line.variant,
+          quantity: line.quantity,
+          unitPrice: Number(line.unit_price),
+        })),
+        total,
+        paymentLabel: merchPaymentLabel(paymentMethod),
+        paymentInstructions: sale.payment_instructions,
+      }).catch((err) => {
+        console.error("[boutique/orders] email error:", err);
+        return null;
+      });
+      if (result && !result.error) console.log("[boutique/orders] confirmation envoyée", rpcResult.order_id);
+    }
 
-  notifyAdmins(
-    "Nouvelle commande boutique 🛍️",
-    `${profile.first_name} ${profile.last_name ?? ""}`.trim() +
-      ` : ${formatPriceFromEuros(total)} (${merchPaymentLabel(paymentMethod).toLowerCase()})`,
-    `/admin/boutique/${saleId}`
-  );
+    await notifyAdmins(
+      "Nouvelle commande boutique 🛍️",
+      `${profile.first_name} ${profile.last_name ?? ""}`.trim() +
+        ` : ${formatPriceFromEuros(total)} (${merchPaymentLabel(paymentMethod).toLowerCase()})`,
+      `/admin/boutique/${saleId}`
+    );
+  });
 
   return NextResponse.json({ success: true, orderId: rpcResult.order_id, total });
 }
