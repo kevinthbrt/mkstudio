@@ -11,6 +11,15 @@
 -- Les commandes passent uniquement par les fonctions place_merch_order et
 -- cancel_merch_order, appelées côté serveur avec la clé service_role : les
 -- adhérents n'ont aucun droit d'écriture direct sur les commandes.
+--
+-- merch_settings.shop_enabled est l'interrupteur global de l'admin : boutique
+-- désactivée = invisible pour les adhérents et commandes refusées.
+--
+-- Les photos des articles sont envoyées par le serveur (clé service_role) dans
+-- le bucket public « merch » : aucune règle de stockage n'est nécessaire, et
+-- Supabase n'autorise plus à en créer en SQL de toute façon.
+--
+-- Écrite sans DROP : l'outil de migration Supabase bloque dessus.
 
 -- ─── Tables ──────────────────────────────────────────────────────────────────
 
@@ -67,17 +76,23 @@ CREATE TABLE IF NOT EXISTS merch_order_lines (
   unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0)
 );
 
+-- Interrupteur global de la boutique (une seule ligne).
+CREATE TABLE IF NOT EXISTS merch_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  shop_enabled BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO merch_settings (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS merch_items_sale_id_idx ON merch_items(sale_id);
 CREATE INDEX IF NOT EXISTS merch_orders_sale_id_idx ON merch_orders(sale_id);
 CREATE INDEX IF NOT EXISTS merch_orders_member_id_idx ON merch_orders(member_id);
 CREATE INDEX IF NOT EXISTS merch_order_lines_order_id_idx ON merch_order_lines(order_id);
 
-DROP TRIGGER IF EXISTS update_merch_sales_updated_at ON merch_sales;
-CREATE TRIGGER update_merch_sales_updated_at BEFORE UPDATE ON merch_sales
+CREATE OR REPLACE TRIGGER update_merch_sales_updated_at BEFORE UPDATE ON merch_sales
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_merch_items_updated_at ON merch_items;
-CREATE TRIGGER update_merch_items_updated_at BEFORE UPDATE ON merch_items
+CREATE OR REPLACE TRIGGER update_merch_items_updated_at BEFORE UPDATE ON merch_items
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ─── Sécurité (RLS) ──────────────────────────────────────────────────────────
@@ -86,57 +101,75 @@ ALTER TABLE merch_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merch_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merch_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merch_order_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE merch_settings ENABLE ROW LEVEL SECURITY;
 
--- Ventes : les brouillons ne sont visibles que par l'admin.
-DROP POLICY IF EXISTS "Members view published merch sales" ON merch_sales;
-CREATE POLICY "Members view published merch sales" ON merch_sales
-  FOR SELECT TO authenticated
-  USING (status <> 'draft' OR is_admin());
+DO $$
+BEGIN
+  -- Ventes : les brouillons ne sont visibles que par l'admin.
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_sales' AND policyname = 'Members view published merch sales') THEN
+    CREATE POLICY "Members view published merch sales" ON merch_sales
+      FOR SELECT TO authenticated
+      USING (status <> 'draft' OR is_admin());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_sales' AND policyname = 'Admins manage merch sales') THEN
+    CREATE POLICY "Admins manage merch sales" ON merch_sales
+      FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  END IF;
 
-DROP POLICY IF EXISTS "Admins manage merch sales" ON merch_sales;
-CREATE POLICY "Admins manage merch sales" ON merch_sales
-  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  -- Articles : visibles dès que leur vente est publiée.
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_items' AND policyname = 'Members view published merch items') THEN
+    CREATE POLICY "Members view published merch items" ON merch_items
+      FOR SELECT TO authenticated
+      USING (
+        is_admin()
+        OR EXISTS (SELECT 1 FROM merch_sales s WHERE s.id = sale_id AND s.status <> 'draft')
+      );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_items' AND policyname = 'Admins manage merch items') THEN
+    CREATE POLICY "Admins manage merch items" ON merch_items
+      FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  END IF;
 
--- Articles : visibles dès que leur vente est publiée.
-DROP POLICY IF EXISTS "Members view published merch items" ON merch_items;
-CREATE POLICY "Members view published merch items" ON merch_items
-  FOR SELECT TO authenticated
-  USING (
-    is_admin()
-    OR EXISTS (SELECT 1 FROM merch_sales s WHERE s.id = sale_id AND s.status <> 'draft')
-  );
+  -- Commandes : chacun voit les siennes, l'admin voit et gère tout.
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_orders' AND policyname = 'Members view own merch orders') THEN
+    CREATE POLICY "Members view own merch orders" ON merch_orders
+      FOR SELECT TO authenticated
+      USING (
+        is_admin()
+        OR member_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
+      );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_orders' AND policyname = 'Admins manage merch orders') THEN
+    CREATE POLICY "Admins manage merch orders" ON merch_orders
+      FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  END IF;
 
-DROP POLICY IF EXISTS "Admins manage merch items" ON merch_items;
-CREATE POLICY "Admins manage merch items" ON merch_items
-  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_order_lines' AND policyname = 'Members view own merch order lines') THEN
+    CREATE POLICY "Members view own merch order lines" ON merch_order_lines
+      FOR SELECT TO authenticated
+      USING (
+        is_admin()
+        OR order_id IN (
+          SELECT o.id FROM merch_orders o
+          WHERE o.member_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
+        )
+      );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_order_lines' AND policyname = 'Admins manage merch order lines') THEN
+    CREATE POLICY "Admins manage merch order lines" ON merch_order_lines
+      FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  END IF;
 
--- Commandes : chacun voit les siennes, l'admin voit et gère tout.
-DROP POLICY IF EXISTS "Members view own merch orders" ON merch_orders;
-CREATE POLICY "Members view own merch orders" ON merch_orders
-  FOR SELECT TO authenticated
-  USING (
-    is_admin()
-    OR member_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
-  );
-
-DROP POLICY IF EXISTS "Admins manage merch orders" ON merch_orders;
-CREATE POLICY "Admins manage merch orders" ON merch_orders
-  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
-
-DROP POLICY IF EXISTS "Members view own merch order lines" ON merch_order_lines;
-CREATE POLICY "Members view own merch order lines" ON merch_order_lines
-  FOR SELECT TO authenticated
-  USING (
-    is_admin()
-    OR order_id IN (
-      SELECT o.id FROM merch_orders o
-      WHERE o.member_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
-    )
-  );
-
-DROP POLICY IF EXISTS "Admins manage merch order lines" ON merch_order_lines;
-CREATE POLICY "Admins manage merch order lines" ON merch_order_lines
-  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  -- Interrupteur : lisible par tous les connectés, modifiable par l'admin.
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_settings' AND policyname = 'Authenticated read merch settings') THEN
+    CREATE POLICY "Authenticated read merch settings" ON merch_settings
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'merch_settings' AND policyname = 'Admins manage merch settings') THEN
+    CREATE POLICY "Admins manage merch settings" ON merch_settings
+      FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+  END IF;
+END $$;
 
 -- ─── Passer une commande ─────────────────────────────────────────────────────
 -- p_lines : [{ "item_id": "...", "variant": "M" | null, "quantity": 2 }, ...]
@@ -171,6 +204,10 @@ BEGIN
 
   IF v_sale.status <> 'open' OR v_sale.closes_at <= now() THEN
     RETURN jsonb_build_object('success', false, 'error', 'sale_closed');
+  END IF;
+
+  IF NOT COALESCE((SELECT shop_enabled FROM merch_settings), false) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'shop_disabled');
   END IF;
 
   IF p_payment_method NOT IN ('cheque', 'virement', 'especes') THEN
@@ -282,31 +319,9 @@ GRANT EXECUTE ON FUNCTION place_merch_order(UUID, UUID, TEXT, JSONB, TEXT) TO se
 GRANT EXECUTE ON FUNCTION cancel_merch_order(UUID, UUID) TO service_role;
 
 -- ─── Images des articles ─────────────────────────────────────────────────────
+-- Bucket public : les photos sont lisibles par leur URL. L'envoi se fait par
+-- la route serveur /api/admin/boutique/upload, avec la clé service_role.
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('merch', 'merch', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
-
-DROP POLICY IF EXISTS "Public read merch images" ON storage.objects;
-CREATE POLICY "Public read merch images"
-  ON storage.objects FOR SELECT
-  TO public
-  USING (bucket_id = 'merch');
-
-DROP POLICY IF EXISTS "Admins upload merch images" ON storage.objects;
-CREATE POLICY "Admins upload merch images"
-  ON storage.objects FOR INSERT
-  TO authenticated
-  WITH CHECK (bucket_id = 'merch' AND is_admin());
-
-DROP POLICY IF EXISTS "Admins update merch images" ON storage.objects;
-CREATE POLICY "Admins update merch images"
-  ON storage.objects FOR UPDATE
-  TO authenticated
-  USING (bucket_id = 'merch' AND is_admin());
-
-DROP POLICY IF EXISTS "Admins delete merch images" ON storage.objects;
-CREATE POLICY "Admins delete merch images"
-  ON storage.objects FOR DELETE
-  TO authenticated
-  USING (bucket_id = 'merch' AND is_admin());

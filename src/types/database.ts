@@ -537,6 +537,23 @@ export interface Database {
         Update: Record<string, never>;
         Relationships: [];
       };
+      merch_settings: {
+        Row: {
+          id: boolean;
+          shop_enabled: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          shop_enabled?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          shop_enabled?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       manual_incomes: {
         Row: {
           id: string;

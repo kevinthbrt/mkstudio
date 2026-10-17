@@ -14,6 +14,7 @@ import type { MerchItem, MerchOrder, MerchOrderLine, MerchSale } from "@/types/d
 type MyOrder = MerchOrder & { lines: MerchOrderLine[] };
 
 interface BoutiqueData {
+  enabled: boolean;
   sales: MerchSale[];
   items: MerchItem[];
   orders: MyOrder[];
@@ -22,13 +23,15 @@ interface BoutiqueData {
 async function fetchBoutique(): Promise<BoutiqueData> {
   const supabase = createClient();
   // RLS : l'adhérent ne voit que les ventes publiées et ses propres commandes.
-  const [salesRes, ordersRes] = await Promise.all([
+  const [salesRes, ordersRes, settingsRes] = await Promise.all([
     supabase.from("merch_sales").select("*").order("closes_at"),
     supabase.from("merch_orders").select("*").order("created_at", { ascending: false }),
+    supabase.from("merch_settings").select("shop_enabled").maybeSingle(),
   ]);
+  const enabled = settingsRes.data?.shop_enabled ?? false;
 
   const sales = salesRes.data ?? [];
-  const openSaleIds = sales.filter((s) => isMerchSaleOpen(s)).map((s) => s.id);
+  const openSaleIds = enabled ? sales.filter((s) => isMerchSaleOpen(s)).map((s) => s.id) : [];
   const orders = ordersRes.data ?? [];
   const orderIds = orders.map((o) => o.id);
 
@@ -43,6 +46,7 @@ async function fetchBoutique(): Promise<BoutiqueData> {
 
   const lines = linesRes.data ?? [];
   return {
+    enabled,
     sales,
     items: itemsRes.data ?? [],
     orders: orders.map((o) => ({ ...o, lines: lines.filter((l) => l.order_id === o.id) })),
@@ -94,7 +98,7 @@ export default function BoutiquePage() {
     );
   }
 
-  const openSales = data.sales.filter((s) => isMerchSaleOpen(s));
+  const openSales = data.enabled ? data.sales.filter((s) => isMerchSaleOpen(s)) : [];
   const saleById = new Map(data.sales.map((s) => [s.id, s]));
 
   return (
@@ -110,7 +114,9 @@ export default function BoutiquePage() {
       {openSales.length === 0 ? (
         <Card className="p-10 text-center">
           <ShoppingBag size={32} className="text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-300 font-medium">Pas de vente en cours</p>
+          <p className="text-gray-300 font-medium">
+            {data.enabled ? "Pas de vente en cours" : "La boutique est fermée pour le moment"}
+          </p>
           <p className="text-gray-500 text-sm mt-1">Les prochaines collections apparaîtront ici.</p>
         </Card>
       ) : (

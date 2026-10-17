@@ -1,4 +1,5 @@
-import type { MerchItem, MerchOrder, MerchOrderLine, MerchSale } from "@/types/database";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, MerchItem, MerchOrder, MerchOrderLine, MerchSale } from "@/types/database";
 
 export type MerchPaymentMethod = MerchOrder["payment_method"];
 
@@ -34,6 +35,7 @@ export function merchSaleStatusLabel(sale: Pick<MerchSale, "status" | "closes_at
 const MERCH_ERROR_MESSAGES: Record<string, string> = {
   sale_not_found: "Cette vente n'existe pas.",
   sale_closed: "Les commandes sont fermées pour cette vente.",
+  shop_disabled: "La boutique est fermée pour le moment.",
   invalid_payment_method: "Choisissez un moyen de paiement.",
   invalid_lines: "Votre panier est vide ou invalide.",
   item_unavailable: "Un article de votre panier n'est plus disponible.",
@@ -111,4 +113,45 @@ export function buildMerchRecap(
       quantity: row.quantity,
       amount: row.amount,
     }));
+}
+
+export interface ShopStatus {
+  /** Interrupteur global de l'admin. */
+  enabled: boolean;
+  /** Vente qui accepte des commandes en ce moment (la plus proche de sa date butoir). */
+  sale: Pick<MerchSale, "id" | "title" | "closes_at"> | null;
+}
+
+/** La boutique « saute aux yeux » uniquement quand elle est activée et qu'une vente est en cours. */
+export function isShopLive(shop: ShopStatus | null | undefined): shop is ShopStatus & { sale: NonNullable<ShopStatus["sale"]> } {
+  return Boolean(shop?.enabled && shop.sale);
+}
+
+/** Lit l'état de la boutique avec le client Supabase de l'utilisateur connecté. */
+export async function fetchShopStatus(supabase: SupabaseClient<Database>): Promise<ShopStatus> {
+  const [settingsRes, saleRes] = await Promise.all([
+    supabase.from("merch_settings").select("shop_enabled").maybeSingle(),
+    supabase
+      .from("merch_sales")
+      .select("id, title, closes_at")
+      .eq("status", "open")
+      .gt("closes_at", new Date().toISOString())
+      .order("closes_at")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  return {
+    enabled: settingsRes.data?.shop_enabled ?? false,
+    sale: saleRes.data ?? null,
+  };
+}
+
+/** « encore 8 jours », « dernier jour », « encore 5 h ». */
+export function timeLeftLabel(closesAt: string, now = Date.now()): string {
+  const ms = new Date(closesAt).getTime() - now;
+  const days = Math.floor(ms / 86_400_000);
+  if (days >= 2) return `encore ${days} jours`;
+  const hours = Math.max(1, Math.floor(ms / 3_600_000));
+  return hours >= 24 ? "dernier jour" : `encore ${hours} h`;
 }

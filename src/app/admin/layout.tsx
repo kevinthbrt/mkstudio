@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { fetchShopStatus } from "@/lib/merch";
 
 export default async function AdminLayout({
   children,
@@ -24,8 +25,10 @@ export default async function AdminLayout({
 
   if (profile.role !== "admin") redirect("/dashboard");
 
+  const shop = await fetchShopStatus(supabase);
+
   return (
-    <DashboardLayout profile={profile} title="Administration">
+    <DashboardLayout profile={profile} title="Administration" shop={shop}>
       {children}
     </DashboardLayout>
   );

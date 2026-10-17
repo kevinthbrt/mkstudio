@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarClock, ChevronRight, Plus, ShoppingBag } from "lucide-react";
+import { CalendarClock, ChevronRight, Eye, EyeOff, Plus, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { SaleFormModal, type SaleFormValues } from "@/components/boutique/SaleFormModal";
 import { isMerchSaleOpen, merchSaleStatusLabel } from "@/lib/merch";
+import { cn } from "@/lib/utils";
 import { formatDateTime, formatPriceFromEuros } from "@/lib/utils";
 import type { MerchOrder, MerchSale } from "@/types/database";
 
@@ -24,11 +25,16 @@ function statusVariant(sale: MerchSale): "gold" | "green" | "gray" | "blue" | "o
 
 async function fetchBoutique() {
   const supabase = createClient();
-  const [salesRes, ordersRes] = await Promise.all([
+  const [salesRes, ordersRes, settingsRes] = await Promise.all([
     supabase.from("merch_sales").select("*").order("closes_at", { ascending: false }),
     supabase.from("merch_orders").select("sale_id, status, total, paid_at"),
+    supabase.from("merch_settings").select("shop_enabled").maybeSingle(),
   ]);
-  return { sales: salesRes.data ?? [], orders: (ordersRes.data ?? []) as OrderSummary[] };
+  return {
+    sales: salesRes.data ?? [],
+    orders: (ordersRes.data ?? []) as OrderSummary[],
+    enabled: settingsRes.data?.shop_enabled ?? false,
+  };
 }
 
 export default function AdminBoutiquePage() {
@@ -37,6 +43,9 @@ export default function AdminBoutiquePage() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -44,12 +53,30 @@ export default function AdminBoutiquePage() {
       if (!active) return;
       setSales(data.sales);
       setOrders(data.orders);
+      setEnabled(data.enabled);
       setLoading(false);
     });
     return () => {
       active = false;
     };
   }, []);
+
+  async function toggleShop() {
+    setToggling(true);
+    setToggleError("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("merch_settings")
+      .update({ shop_enabled: !enabled, updated_at: new Date().toISOString() })
+      .eq("id", true);
+    if (error) setToggleError("Le réglage n'a pas pu être enregistré.");
+    else {
+      setEnabled(!enabled);
+      // Rafraîchit la navigation (pastille « En cours », menu des adhérents).
+      router.refresh();
+    }
+    setToggling(false);
+  }
 
   async function handleCreate(values: SaleFormValues): Promise<string | null> {
     const supabase = createClient();
@@ -59,6 +86,8 @@ export default function AdminBoutiquePage() {
     router.push(`/admin/boutique/${data.id}`);
     return null;
   }
+
+  const openSale = sales.find((s) => isMerchSaleOpen(s));
 
   if (loading) {
     return (
@@ -82,6 +111,54 @@ export default function AdminBoutiquePage() {
           Nouvelle vente
         </Button>
       </div>
+
+      {/* Interrupteur global */}
+      <Card className={cn("p-5", enabled && "border-[#D4AF37]/30 shadow-[0_0_30px_rgba(212,175,55,0.1)]")}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl",
+                enabled ? "bg-[#D4AF37]/15 text-[#D4AF37]" : "bg-white/5 text-gray-500"
+              )}
+            >
+              {enabled ? <Eye size={18} /> : <EyeOff size={18} />}
+            </div>
+            <div>
+              <p className="font-semibold text-white">
+                {enabled ? "Boutique activée" : "Boutique désactivée"}
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {enabled
+                  ? openSale
+                    ? `Les adhérents voient « ${openSale.title} » mise en avant sur toutes leurs pages.`
+                    : "Visible par les adhérents, mais aucune vente n'est ouverte : rien n'est mis en avant."
+                  : "Invisible pour les adhérents, et aucune commande n'est acceptée. Vous pouvez préparer vos ventes tranquillement."}
+              </p>
+              {toggleError && <p className="mt-1 text-sm text-red-400">{toggleError}</p>}
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label="Activer la boutique"
+            disabled={toggling}
+            onClick={toggleShop}
+            className={cn(
+              "relative h-8 w-14 flex-shrink-0 self-end rounded-full transition-colors disabled:opacity-50 sm:self-auto",
+              enabled ? "bg-gradient-to-r from-[#C9A227] to-[#E8C84A]" : "bg-white/10"
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all",
+                enabled ? "left-7" : "left-1"
+              )}
+            />
+          </button>
+        </div>
+      </Card>
 
       {sales.length === 0 ? (
         <Card className="p-10 text-center">

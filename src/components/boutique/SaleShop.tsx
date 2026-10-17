@@ -6,7 +6,7 @@ import { CalendarClock, ChevronDown, Minus, Package, Plus, ShoppingBag, Trash2 }
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Input";
-import { MERCH_PAYMENT_METHODS, type MerchPaymentMethod } from "@/lib/merch";
+import { MERCH_PAYMENT_METHODS, timeLeftLabel, type MerchPaymentMethod } from "@/lib/merch";
 import { cn, formatDateTime, formatPriceFromEuros } from "@/lib/utils";
 import type { MerchItem, MerchSale } from "@/types/database";
 
@@ -18,14 +18,6 @@ interface CartLine {
 
 function cartKey(itemId: string, variant: string | null) {
   return `${itemId}::${variant ?? ""}`;
-}
-
-function daysLeftLabel(closesAt: string): string {
-  const ms = new Date(closesAt).getTime() - Date.now();
-  const days = Math.floor(ms / 86_400_000);
-  if (days >= 2) return `encore ${days} jours`;
-  const hours = Math.max(1, Math.floor(ms / 3_600_000));
-  return hours >= 24 ? "dernier jour" : `encore ${hours} h`;
 }
 
 function ItemCard({ item, onAdd }: { item: MerchItem; onAdd: (variant: string | null, quantity: number) => void }) {
@@ -192,7 +184,7 @@ export function SaleShop({
         {sale.description && <p className="mt-1.5 max-w-2xl text-sm text-gray-400">{sale.description}</p>}
         <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-black/30 px-2.5 py-1.5 text-xs font-medium text-[#D4AF37]">
           <CalendarClock size={13} />
-          Commandes jusqu&apos;au {formatDateTime(sale.closes_at)} · {daysLeftLabel(sale.closes_at)}
+          Commandes jusqu&apos;au {formatDateTime(sale.closes_at)} · {timeLeftLabel(sale.closes_at)}
         </p>
       </div>
 

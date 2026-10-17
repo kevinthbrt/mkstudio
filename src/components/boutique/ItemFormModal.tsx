@@ -6,7 +6,6 @@ import { ImagePlus, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
-import { createClient } from "@/lib/supabase/client";
 import type { MerchItem } from "@/types/database";
 
 export interface ItemFormValues {
@@ -17,7 +16,7 @@ export interface ItemFormValues {
   image_url: string | null;
 }
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /** "XS, S , M,,L" → ["XS", "S", "M", "L"], sans doublon, dans l'ordre saisi. */
 function parseVariants(raw: string): string[] {
@@ -63,26 +62,24 @@ export function ItemFormModal({
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setError("Image trop lourde : 5 Mo maximum.");
+      setError("Image trop lourde : 4 Mo maximum.");
       return;
     }
 
     setUploading(true);
     setError("");
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${saleId}/${crypto.randomUUID()}.${ext}`;
-    const supabase = createClient();
-    const { error: uploadError } = await supabase.storage.from("merch").upload(path, file, {
-      contentType: file.type,
-    });
+    const body = new FormData();
+    body.append("file", file);
+    body.append("saleId", saleId);
+    const res = await fetch("/api/admin/boutique/upload", { method: "POST", body });
+    const data = await res.json().catch(() => ({}));
     setUploading(false);
 
-    if (uploadError) {
-      setError("L'image n'a pas pu être envoyée.");
+    if (!res.ok || !data.url) {
+      setError(data.error || "L'image n'a pas pu être envoyée.");
       return;
     }
-    const { data } = supabase.storage.from("merch").getPublicUrl(path);
-    setImageUrl(data.publicUrl);
+    setImageUrl(data.url);
   }
 
   async function handleSubmit(e: React.FormEvent) {
