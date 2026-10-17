@@ -418,6 +418,125 @@ export interface Database {
         };
         Relationships: [];
       };
+      merch_sales: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          closes_at: string;
+          payment_instructions: string | null;
+          status: "draft" | "open" | "supplier_ordered" | "completed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          closes_at: string;
+          payment_instructions?: string | null;
+          status?: "draft" | "open" | "supplier_ordered" | "completed";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          title?: string;
+          description?: string | null;
+          closes_at?: string;
+          payment_instructions?: string | null;
+          status?: "draft" | "open" | "supplier_ordered" | "completed";
+        };
+        Relationships: [];
+      };
+      merch_items: {
+        Row: {
+          id: string;
+          sale_id: string;
+          name: string;
+          description: string | null;
+          price: number;
+          image_url: string | null;
+          variants: string[];
+          position: number;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          sale_id: string;
+          name: string;
+          description?: string | null;
+          price: number;
+          image_url?: string | null;
+          variants?: string[];
+          position?: number;
+          active?: boolean;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+          price?: number;
+          image_url?: string | null;
+          variants?: string[];
+          position?: number;
+          active?: boolean;
+        };
+        Relationships: [];
+      };
+      merch_orders: {
+        Row: {
+          id: string;
+          sale_id: string;
+          member_id: string;
+          status: "confirmed" | "cancelled";
+          payment_method: "cheque" | "virement" | "especes";
+          total: number;
+          note: string | null;
+          paid_at: string | null;
+          delivered_at: string | null;
+          cancelled_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sale_id: string;
+          member_id: string;
+          status?: "confirmed" | "cancelled";
+          payment_method: "cheque" | "virement" | "especes";
+          total: number;
+          note?: string | null;
+        };
+        Update: {
+          status?: "confirmed" | "cancelled";
+          paid_at?: string | null;
+          delivered_at?: string | null;
+          cancelled_at?: string | null;
+        };
+        Relationships: [];
+      };
+      merch_order_lines: {
+        Row: {
+          id: string;
+          order_id: string;
+          item_id: string | null;
+          item_name: string;
+          variant: string | null;
+          quantity: number;
+          unit_price: number;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          item_id?: string | null;
+          item_name: string;
+          variant?: string | null;
+          quantity: number;
+          unit_price: number;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       manual_incomes: {
         Row: {
           id: string;
@@ -526,6 +645,20 @@ export interface Database {
         Args: { p_member_id: string; p_session_id: string; p_guest_names?: string | null };
         Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
       };
+      place_merch_order: {
+        Args: {
+          p_member_id: string;
+          p_sale_id: string;
+          p_payment_method: string;
+          p_lines: { item_id: string; variant: string | null; quantity: number }[];
+          p_note?: string | null;
+        };
+        Returns: { success: boolean; error?: string; order_id?: string; total?: number };
+      };
+      cancel_merch_order: {
+        Args: { p_member_id: string; p_order_id: string };
+        Returns: { success: boolean; error?: string };
+      };
       book_massage_session: {
         Args: {
           p_session_id: string;
@@ -558,3 +691,7 @@ export type ClassBooking = Database["public"]["Tables"]["class_bookings"]["Row"]
 export type WaitlistEntry = Database["public"]["Tables"]["class_waitlists"]["Row"];
 export type Expense = Database["public"]["Tables"]["expenses"]["Row"];
 export type ManualIncome = Database["public"]["Tables"]["manual_incomes"]["Row"];
+export type MerchSale = Database["public"]["Tables"]["merch_sales"]["Row"];
+export type MerchItem = Database["public"]["Tables"]["merch_items"]["Row"];
+export type MerchOrder = Database["public"]["Tables"]["merch_orders"]["Row"];
+export type MerchOrderLine = Database["public"]["Tables"]["merch_order_lines"]["Row"];

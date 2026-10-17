@@ -11,6 +11,7 @@ import {
   Mail,
   Package,
   Settings,
+  ShoppingBag,
   Trophy,
   User,
   Users,
@@ -34,6 +35,7 @@ const memberNav: NavItem[] = [
   { href: "/dashboard/sessions", label: "Mes séances", shortLabel: "Séances", icon: <BarChart3 size={18} /> },
   { href: "/dashboard/achievements", label: "Badges & Niveau", shortLabel: "Badges", icon: <Trophy size={18} /> },
   { href: "/dashboard/purchases", label: "Achats & Factures", shortLabel: "Achats", icon: <CreditCard size={18} /> },
+  { href: "/dashboard/boutique", label: "Boutique", icon: <ShoppingBag size={18} /> },
   { href: "/dashboard/profile", label: "Mon profil", shortLabel: "Profil", icon: <User size={18} /> },
 ];
 
@@ -43,6 +45,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/members", label: "Adhérents", icon: <Users size={18} /> },
   { href: "/admin/products", label: "Produits", icon: <Package size={18} /> },
   { href: "/admin/orders", label: "Ventes", icon: <CreditCard size={18} /> },
+  { href: "/admin/boutique", label: "Boutique", icon: <ShoppingBag size={18} /> },
   { href: "/admin/marketing", label: "Marketing", icon: <Mail size={18} /> },
   { href: "/admin/comptabilite", label: "Comptabilité", shortLabel: "Compta", icon: <BookOpen size={18} /> },
   { href: "/admin/settings", label: "Paramètres", icon: <Settings size={18} /> },
@@ -171,7 +174,9 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
     const rightItems = [memberNav[3]];              // Badges
 
     const isAccountActive =
-      pathname.startsWith("/dashboard/purchases") || pathname.startsWith("/dashboard/profile");
+      pathname.startsWith("/dashboard/purchases") ||
+      pathname.startsWith("/dashboard/profile") ||
+      pathname.startsWith("/dashboard/boutique");
 
     return (
       <>
@@ -205,6 +210,14 @@ export function BottomNav({ role }: { role: "admin" | "member" }) {
               >
                 <CreditCard size={16} className="text-gray-500" />
                 Achats & Factures
+              </Link>
+              <div className="h-px bg-white/5" />
+              <Link
+                href="/dashboard/boutique"
+                className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <ShoppingBag size={16} className="text-gray-500" />
+                Boutique
               </Link>
             </div>
           </div>

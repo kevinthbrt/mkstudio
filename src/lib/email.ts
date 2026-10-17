@@ -587,3 +587,76 @@ export async function sendMarketingEmail(params: MarketingEmailParams & { to: st
     html,
   });
 }
+
+// ─── Boutique éphémère : confirmation de commande ─────────────────────────────
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function sendMerchOrderConfirmationEmail(params: {
+  to: string;
+  firstName: string;
+  saleTitle: string;
+  closesAt: string;
+  lines: { itemName: string; variant: string | null; quantity: number; unitPrice: number }[];
+  total: number;
+  paymentLabel: string;
+  paymentInstructions: string | null;
+}) {
+  const { to, firstName, saleTitle, closesAt, lines, total, paymentLabel, paymentInstructions } = params;
+  const eur = (amount: number) =>
+    new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
+  const deadline = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  }).format(new Date(closesAt));
+
+  const lineRows = lines
+    .map((line) =>
+      infoRow(
+        `${line.quantity} × ${escapeHtml(line.itemName)}${line.variant ? ` (${escapeHtml(line.variant)})` : ""}`,
+        eur(line.quantity * line.unitPrice)
+      )
+    )
+    .join("");
+
+  const html = layout(`
+    <div style="display:inline-block;background:#D4AF3722;border:1px solid #D4AF3744;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#D4AF37;font-size:13px;font-weight:600;">Commande enregistrée</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${escapeHtml(saleTitle)}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${escapeHtml(firstName)}, ta commande a bien été enregistrée.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${lineRows}
+      ${infoRow("<strong>Total</strong>", `<strong>${eur(total)}</strong>`)}
+      ${infoRow("Règlement", escapeHtml(paymentLabel))}
+    </table>
+    ${divider()}
+    ${paymentInstructions
+      ? `<p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 16px;white-space:pre-line;">${escapeHtml(paymentInstructions)}</p>`
+      : ""}
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 24px;">
+      Les commandes sont groupées : nous passons commande auprès du fournisseur après le ${deadline}, puis nous te remettons tes articles à la salle.
+      Tu peux annuler depuis ton espace jusqu'à cette date, tant que la commande n'est pas réglée.
+    </p>
+    <div style="text-align:center;">
+      ${btn("Voir mes commandes", `${SITE_URL}/dashboard/boutique`)}
+    </div>
+  `);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: `Commande enregistrée : ${saleTitle}`,
+    html,
+  });
+}
