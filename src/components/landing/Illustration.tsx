@@ -13,6 +13,8 @@ interface IllustrationProps {
   className?: string;
   priority?: boolean;
   sizes?: string;
+  /** Point de cadrage de la photo (object-position), ex. "center 35%". */
+  position?: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export function Illustration({
   className,
   priority,
   sizes = "(max-width: 768px) 100vw, 50vw",
+  position,
 }: IllustrationProps) {
   const src = findPhoto(name);
 
@@ -36,7 +39,15 @@ export function Illustration({
       className={cn("relative w-full overflow-hidden rounded-2xl bg-[#F4EFE3]", className)}
     >
       {src ? (
-        <Image src={src} alt={label} fill sizes={sizes} priority={priority} className="object-cover" />
+        <Image
+          src={src}
+          alt={label}
+          fill
+          sizes={sizes}
+          priority={priority}
+          className="object-cover"
+          style={position ? { objectPosition: position } : undefined}
+        />
       ) : (
         fallback
       )}

@@ -180,6 +180,7 @@ export const massages = {
     {
       name: "Massage californien",
       photo: "massage-californien",
+      photoPosition: "center",
       duration: "30 min, 1 h ou 1 h 30",
       price: "à partir de 40 €",
       description:
@@ -188,6 +189,7 @@ export const massages = {
     {
       name: "Massage ayurvédique",
       photo: "massage-ayurvedique",
+      photoPosition: "center 65%",
       duration: "30 min, 1 h ou 1 h 30",
       price: "à partir de 40 €",
       description:
@@ -196,6 +198,7 @@ export const massages = {
     {
       name: "Drainage lymphatique",
       photo: "drainage-lymphatique",
+      photoPosition: "center",
       duration: "Séance ou pack de 6",
       price: "75 €",
       description:

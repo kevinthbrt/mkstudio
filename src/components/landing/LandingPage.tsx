@@ -169,6 +169,7 @@ export function LandingPage() {
                 fallback={<IconVisual icon={UserRound} size="lg" />}
                 ratio="16/9"
                 className="rounded-none"
+                position="center 36%"
                 label="Coach et adhérent sur un exercice"
               />
               <div className="flex flex-1 flex-col p-7">
@@ -321,6 +322,7 @@ export function LandingPage() {
                   fallback={<IconVisual icon={MASSAGE_ICONS[p.photo] ?? HandHeart} size="lg" />}
                   ratio="16/10"
                   className="rounded-none"
+                  position={p.photoPosition}
                   sizes="(max-width: 768px) 100vw, 33vw"
                   label={p.name}
                 />
