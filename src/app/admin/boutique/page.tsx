@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime, formatPriceFromEuros } from "@/lib/utils";
 import type { MerchOrder, MerchSale } from "@/types/database";
 
-type OrderSummary = Pick<MerchOrder, "sale_id" | "status" | "total" | "paid_at">;
+type OrderSummary = Pick<MerchOrder, "sale_id" | "status" | "total" | "paid_at" | "paid_amount">;
 
 function statusVariant(sale: MerchSale): "gold" | "green" | "gray" | "blue" | "orange" {
   if (sale.status === "draft") return "gray";
@@ -27,7 +27,7 @@ async function fetchBoutique() {
   const supabase = createClient();
   const [salesRes, ordersRes, settingsRes] = await Promise.all([
     supabase.from("merch_sales").select("*").order("closes_at", { ascending: false }),
-    supabase.from("merch_orders").select("sale_id, status, total, paid_at"),
+    supabase.from("merch_orders").select("sale_id, status, total, paid_at, paid_amount"),
     supabase.from("merch_settings").select("shop_enabled").maybeSingle(),
   ]);
   return {
@@ -178,7 +178,7 @@ export default function AdminBoutiquePage() {
             const total = saleOrders.reduce((sum, o) => sum + Number(o.total), 0);
             const paid = saleOrders
               .filter((o) => o.paid_at)
-              .reduce((sum, o) => sum + Number(o.total), 0);
+              .reduce((sum, o) => sum + Number(o.paid_amount ?? o.total), 0);
 
             return (
               <Link key={sale.id} href={`/admin/boutique/${sale.id}`}>

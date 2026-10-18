@@ -10,12 +10,14 @@ import {
   Check,
   Download,
   Edit,
+  PencilLine,
   EyeOff,
   Eye,
   Megaphone,
   Package,
   PackageCheck,
   Plus,
+  UserPlus,
   ShoppingBag,
   Trash2,
   Truck,
@@ -29,9 +31,11 @@ import { Card } from "@/components/ui/Card";
 import { SaleFormModal, type SaleFormValues } from "@/components/boutique/SaleFormModal";
 import { ItemFormModal, type ItemFormValues } from "@/components/boutique/ItemFormModal";
 import { AnnounceModal } from "@/components/boutique/AnnounceModal";
+import { AdminOrderModal } from "@/components/boutique/AdminOrderModal";
 import {
   buildMerchRecap,
   isMerchSaleOpen,
+  merchPaymentGap,
   merchPaymentLabel,
   merchSaleStatusLabel,
 } from "@/lib/merch";
@@ -133,6 +137,10 @@ export default function AdminSalePage() {
   const [itemForm, setItemForm] = useState<{ open: boolean; item: MerchItem | null }>({ open: false, item: null });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showAnnounce, setShowAnnounce] = useState(false);
+  const [orderForm, setOrderForm] = useState<{ open: boolean; order: OrderWithDetails | null }>({
+    open: false,
+    order: null,
+  });
   const [notice, setNotice] = useState("");
 
   const applyData = useCallback((data: SaleData) => {
@@ -159,7 +167,9 @@ export default function AdminSalePage() {
   const recap = useMemo(() => buildMerchRecap(orders, items), [orders, items]);
   const stats = useMemo(() => {
     const total = confirmed.reduce((sum, o) => sum + Number(o.total), 0);
-    const paid = confirmed.filter((o) => o.paid_at).reduce((sum, o) => sum + Number(o.total), 0);
+    const paid = confirmed
+      .filter((o) => o.paid_at)
+      .reduce((sum, o) => sum + Number(o.paid_amount ?? o.total), 0);
     const articles = recap.reduce((sum, r) => sum + r.quantity, 0);
     const delivered = confirmed.filter((o) => o.delivered_at).length;
     return { total, paid, articles, delivered };
@@ -314,6 +324,8 @@ export default function AdminSalePage() {
   }
 
   const ordersOpen = isMerchSaleOpen(sale);
+  // Après la commande fournisseur, le récap est parti : plus de création ni de modification.
+  const ordersLocked = sale.status === "supplier_ordered" || sale.status === "completed";
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -598,10 +610,18 @@ export default function AdminSalePage() {
                 </button>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={exportOrders} disabled={confirmed.length === 0}>
-              <Download size={14} />
-              Exporter (Excel)
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {!ordersLocked && (
+                <Button size="sm" onClick={() => setOrderForm({ open: true, order: null })} disabled={items.length === 0}>
+                  <UserPlus size={14} />
+                  Commander pour un adhérent
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={exportOrders} disabled={confirmed.length === 0}>
+                <Download size={14} />
+                Exporter (Excel)
+              </Button>
+            </div>
           </div>
 
           {filteredOrders.length === 0 ? (
@@ -610,6 +630,7 @@ export default function AdminSalePage() {
             <div className="space-y-3">
               {filteredOrders.map((order) => {
                 const cancelled = order.status === "cancelled";
+                const gap = merchPaymentGap(order);
                 return (
                   <Card key={order.id} className={cn("p-4", cancelled && "opacity-50")}>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -623,6 +644,8 @@ export default function AdminSalePage() {
                               <Badge variant={order.paid_at ? "green" : "orange"}>
                                 {order.paid_at ? "Réglée" : "À régler"}
                               </Badge>
+                              {gap > 0 && <Badge variant="orange">Reste {formatPriceFromEuros(gap)} à encaisser</Badge>}
+                              {gap < 0 && <Badge variant="purple">{formatPriceFromEuros(-gap)} à rembourser</Badge>}
                               {order.delivered_at && <Badge variant="blue">Remise</Badge>}
                             </>
                           )}
@@ -643,11 +666,40 @@ export default function AdminSalePage() {
                           size="sm"
                           variant={order.paid_at ? "outline" : "gold"}
                           disabled={busyId === order.id}
-                          onClick={() => updateOrder(order, { paid_at: order.paid_at ? null : new Date().toISOString() })}
+                          onClick={() =>
+                            updateOrder(
+                              order,
+                              order.paid_at
+                                ? { paid_at: null, paid_amount: null }
+                                : { paid_at: new Date().toISOString(), paid_amount: Number(order.total) }
+                            )
+                          }
                         >
                           {order.paid_at ? <X size={13} /> : <Wallet size={13} />}
                           {order.paid_at ? "Annuler le règlement" : "Marquer réglée"}
                         </Button>
+                        {gap !== 0 && (
+                          <Button
+                            size="sm"
+                            variant="gold"
+                            disabled={busyId === order.id}
+                            onClick={() => updateOrder(order, { paid_amount: Number(order.total) })}
+                          >
+                            <Wallet size={13} />
+                            {gap > 0 ? "Reste encaissé" : "Remboursement fait"}
+                          </Button>
+                        )}
+                        {!ordersLocked && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyId === order.id}
+                            onClick={() => setOrderForm({ open: true, order })}
+                          >
+                            <PencilLine size={13} />
+                            Modifier
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -680,6 +732,15 @@ export default function AdminSalePage() {
 
       {showSaleForm && (
         <SaleFormModal open sale={sale} onClose={() => setShowSaleForm(false)} onSubmit={handleSaleSubmit} />
+      )}
+      {orderForm.open && (
+        <AdminOrderModal
+          saleId={saleId}
+          items={items}
+          order={orderForm.order ? { ...orderForm.order, memberName: memberName(orderForm.order.member) } : null}
+          onClose={() => setOrderForm({ open: false, order: null })}
+          onSaved={load}
+        />
       )}
       {showAnnounce && (
         <AnnounceModal saleId={saleId} onClose={() => setShowAnnounce(false)} onSent={load} />

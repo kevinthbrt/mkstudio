@@ -44,6 +44,8 @@ const MERCH_ERROR_MESSAGES: Record<string, string> = {
   order_not_found: "Commande introuvable.",
   already_cancelled: "Cette commande est déjà annulée.",
   already_paid: "Cette commande est déjà réglée : contactez la salle pour l'annuler.",
+  sale_locked: "La commande fournisseur est passée : les commandes ne peuvent plus être modifiées.",
+  member_not_found: "Adhérent introuvable.",
 };
 
 export function merchErrorMessage(code: string | undefined): string {
@@ -154,4 +156,13 @@ export function timeLeftLabel(closesAt: string, now = Date.now()): string {
   if (days >= 2) return `encore ${days} jours`;
   const hours = Math.max(1, Math.floor(ms / 3_600_000));
   return hours >= 24 ? "dernier jour" : `encore ${hours} h`;
+}
+
+/**
+ * Écart entre ce qui a été encaissé et le total actuel d'une commande réglée
+ * puis modifiée. Positif : reste à encaisser. Négatif : à rembourser.
+ */
+export function merchPaymentGap(order: Pick<MerchOrder, "paid_at" | "paid_amount" | "total">): number {
+  if (!order.paid_at || order.paid_amount === null) return 0;
+  return Math.round((Number(order.total) - Number(order.paid_amount)) * 100) / 100;
 }

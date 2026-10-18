@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { SaleShop } from "@/components/boutique/SaleShop";
-import { isMerchSaleOpen, merchPaymentLabel } from "@/lib/merch";
+import { isMerchSaleOpen, merchPaymentGap, merchPaymentLabel } from "@/lib/merch";
 import { formatDateTime, formatPriceFromEuros } from "@/lib/utils";
 import type { MerchItem, MerchOrder, MerchOrderLine, MerchSale } from "@/types/database";
 
@@ -152,6 +152,12 @@ export default function BoutiquePage() {
                           <Badge variant={order.paid_at ? "green" : "orange"}>
                             {order.paid_at ? "Réglée" : "À régler"}
                           </Badge>
+                        )}
+                        {order.status === "confirmed" && merchPaymentGap(order) > 0 && (
+                          <Badge variant="orange">Reste {formatPriceFromEuros(merchPaymentGap(order))} à régler</Badge>
+                        )}
+                        {order.status === "confirmed" && merchPaymentGap(order) < 0 && (
+                          <Badge variant="purple">{formatPriceFromEuros(-merchPaymentGap(order))} à vous rembourser</Badge>
                         )}
                       </div>
                       <ul className="mt-2 space-y-0.5 text-sm text-gray-300">

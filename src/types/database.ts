@@ -496,6 +496,7 @@ export interface Database {
           total: number;
           note: string | null;
           paid_at: string | null;
+          paid_amount: number | null;
           delivered_at: string | null;
           cancelled_at: string | null;
           created_at: string;
@@ -512,6 +513,7 @@ export interface Database {
         Update: {
           status?: "confirmed" | "cancelled";
           paid_at?: string | null;
+          paid_amount?: number | null;
           delivered_at?: string | null;
           cancelled_at?: string | null;
         };
@@ -663,6 +665,24 @@ export interface Database {
       book_collective_session: {
         Args: { p_member_id: string; p_session_id: string; p_guest_names?: string | null };
         Returns: { success: boolean; error?: string; spots_left?: number; balance?: number; spots_used?: number; new_balance?: number };
+      };
+      admin_save_merch_order: {
+        Args: {
+          p_order_id: string | null;
+          p_sale_id: string;
+          p_member_id: string;
+          p_payment_method: string;
+          p_lines: { item_id: string; variant: string | null; quantity: number }[];
+          p_note?: string | null;
+        };
+        Returns: {
+          success: boolean;
+          error?: string;
+          order_id?: string;
+          created?: boolean;
+          total?: number;
+          previous_total?: number | null;
+        };
       };
       place_merch_order: {
         Args: {
