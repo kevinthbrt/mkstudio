@@ -20,8 +20,7 @@ attendu écrit dedans. Rien ne casse : vous pouvez en ajouter une à la fois.
 
 | Nom du fichier             | Ce que la photo doit montrer                          | Format conseillé |
 | -------------------------- | ----------------------------------------------------- | ---------------- |
-| `salle`                    | Vue d'ensemble de la salle, en lumière naturelle       | Paysage 4/3      |
-| `coach-cours-collectif`    | Le coach pendant un cours collectif                    | Carré            |
+| `accueil`                  | Grande photo d'accueil (Manon dans la salle)           | Paysage 4/3      |
 | `espace-massage`           | L'espace massage, la table de soin                     | Carré            |
 | `coaching-individualise`   | Coach et adhérent sur un exercice                      | Paysage 16/9     |
 | `cours-collectif`          | Un cours collectif en petit groupe                     | Paysage 16/9     |
@@ -33,7 +32,7 @@ attendu écrit dedans. Rien ne casse : vous pouvez en ajouter une à la fois.
 | `portrait-kevin`           | Portrait de Kevin Thubert                              | Carré            |
 | `facade`                   | La façade et l'entrée de la salle                      | Paysage 4/3      |
 
-`portrait-kevin` sert deux fois : dans la section Ostéopathie et dans la
+`portrait-kevin` sert trois fois : en haut de page, dans la section Ostéopathie et dans la
 section Équipe. Un seul fichier suffit.
 
 ## Conseils

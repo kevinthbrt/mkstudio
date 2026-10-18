@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Droplets,
-  Dumbbell,
   Flower2,
   Hand,
   HandHeart,
@@ -116,20 +115,20 @@ export function LandingPage() {
 
           <div className="grid gap-4">
             <Illustration
-              name="salle"
+              name="accueil"
               fallback={<LogoVisual />}
               ratio="4/3"
               priority
               sizes="(max-width: 1024px) 100vw, 45vw"
-              label="Photo principale : vue d'ensemble de la salle, lumière naturelle"
+              label="Manon Delmas, coach, dans la salle MK Studio"
             />
             <div className="grid grid-cols-2 gap-4">
               <Illustration
-                name="coach-cours-collectif"
-                fallback={<IconVisual icon={Dumbbell} caption="Coaching" />}
+                name="portrait-kevin"
+                fallback={<IconVisual icon={Hand} caption="Ostéopathie" />}
                 ratio="1/1"
                 sizes="(max-width: 1024px) 50vw, 22vw"
-                label="Coach pendant un cours collectif"
+                label="Kevin Thubert, ostéopathe"
               />
               <Illustration
                 name="espace-massage"
