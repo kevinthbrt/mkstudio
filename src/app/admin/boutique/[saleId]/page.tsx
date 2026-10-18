@@ -12,6 +12,7 @@ import {
   Edit,
   EyeOff,
   Eye,
+  Megaphone,
   Package,
   PackageCheck,
   Plus,
@@ -27,6 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { SaleFormModal, type SaleFormValues } from "@/components/boutique/SaleFormModal";
 import { ItemFormModal, type ItemFormValues } from "@/components/boutique/ItemFormModal";
+import { AnnounceModal } from "@/components/boutique/AnnounceModal";
 import {
   buildMerchRecap,
   isMerchSaleOpen,
@@ -130,6 +132,7 @@ export default function AdminSalePage() {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [itemForm, setItemForm] = useState<{ open: boolean; item: MerchItem | null }>({ open: false, item: null });
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showAnnounce, setShowAnnounce] = useState(false);
   const [notice, setNotice] = useState("");
 
   const applyData = useCallback((data: SaleData) => {
@@ -203,7 +206,8 @@ export default function AdminSalePage() {
       return;
     }
     setNotice("");
-    changeStatus("open");
+    // À l'ouverture, on propose tout de suite de prévenir les adhérents.
+    changeStatus("open").then(() => setShowAnnounce(true));
   }
 
   // ─── Articles ─────────────────────────────────────────────────────────────
@@ -331,6 +335,12 @@ export default function AdminSalePage() {
               <CalendarClock size={14} />
               Date butoir : {formatDateTime(sale.closes_at)}
             </p>
+            {sale.announced_at && (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-green-400/80">
+                <Megaphone size={14} />
+                Annonce envoyée aux adhérents le {formatDateTime(sale.announced_at)}
+              </p>
+            )}
             {sale.description && <p className="mt-2 max-w-2xl text-sm text-gray-400">{sale.description}</p>}
           </div>
 
@@ -343,6 +353,12 @@ export default function AdminSalePage() {
               <Button onClick={openSale}>
                 <ShoppingBag size={15} />
                 Ouvrir les commandes
+              </Button>
+            )}
+            {sale.status === "open" && !sale.announced_at && (
+              <Button variant="outline" onClick={() => setShowAnnounce(true)}>
+                <Megaphone size={15} />
+                Prévenir les adhérents
               </Button>
             )}
             {sale.status === "open" && (
@@ -664,6 +680,9 @@ export default function AdminSalePage() {
 
       {showSaleForm && (
         <SaleFormModal open sale={sale} onClose={() => setShowSaleForm(false)} onSubmit={handleSaleSubmit} />
+      )}
+      {showAnnounce && (
+        <AnnounceModal saleId={saleId} onClose={() => setShowAnnounce(false)} onSent={load} />
       )}
       {itemForm.open && (
         <ItemFormModal

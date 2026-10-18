@@ -660,3 +660,23 @@ export async function sendMerchOrderConfirmationEmail(params: {
     html,
   });
 }
+
+// ─── Envoi groupé (jusqu'à 100 emails par requête Resend) ─────────────────────
+// Évite la limite de requêtes par seconde de Resend lors d'un envoi à tous les
+// adhérents. Renvoie le nombre d'emails acceptés par Resend.
+export async function sendEmailBatch(messages: { to: string; subject: string; html: string }[]): Promise<number> {
+  const resend = getResend();
+  let accepted = 0;
+
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100);
+    const result = await resend.batch.send(chunk.map((m) => ({ from: FROM, ...m })));
+    if (result.error) {
+      console.error("[email] Resend batch error:", result.error, "| lot de", chunk.length);
+      continue;
+    }
+    accepted += chunk.length;
+  }
+
+  return accepted;
+}

@@ -426,6 +426,7 @@ export interface Database {
           closes_at: string;
           payment_instructions: string | null;
           status: "draft" | "open" | "supplier_ordered" | "completed";
+          announced_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -440,6 +441,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          announced_at?: string | null;
           title?: string;
           description?: string | null;
           closes_at?: string;
