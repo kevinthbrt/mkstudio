@@ -21,7 +21,7 @@ export const hero = {
   eyebrow: "Le Vigan en Quercy",
   title: "S'entraîner encadré, récupérer sur place.",
   subtitle:
-    "MK Studio, c'est du coaching avec un programme construit pour vous, seul ou en duo, et des cours collectifs à huit personnes maximum. Sur place également : ostéopathie, massages et drainage lymphatique.",
+    "MK Studio, c'est du coaching avec un programme construit pour vous, seul ou en salle partagée, et des cours collectifs à huit personnes maximum. Sur place également : ostéopathie, massages et drainage lymphatique.",
   primaryCta: "Créer mon compte",
   secondaryCta: "Voir les prestations",
   points: [
@@ -38,7 +38,7 @@ export const coaching = {
     "Dans les deux cas, le coach est dans la salle. L'accès aux machines se fait en sa présence, jamais seul.",
   individualise: {
     name: "Coaching individualisé",
-    tag: "Seul ou en duo",
+    tag: "Seul ou en salle partagée",
     description:
       "Le programme est construit pour vous : votre niveau, vos objectifs, vos contraintes. Deux façons de le suivre.",
     options: [
@@ -48,7 +48,7 @@ export const coaching = {
           "Vous êtes seul dans la salle avec le coach. Son attention est entièrement sur vous, du début à la fin de la séance.",
       },
       {
-        name: "En duo",
+        name: "En salle partagée",
         description:
           "Chacun suit son propre programme, mais vous partagez la salle. Le suivi reste individualisé et le coût par personne baisse.",
       },
@@ -209,8 +209,8 @@ export const tarifs = {
       lignes: [
         { name: "Individuel, à l'unité", price: "32 €" },
         { name: "Individuel, pack de 10", price: "260 €" },
-        { name: "En duo, à l'unité", price: "25 €" },
-        { name: "En duo, pack de 10", price: "220 €" },
+        { name: "En salle partagée, à l'unité", price: "25 €" },
+        { name: "En salle partagée, pack de 10", price: "220 €" },
       ],
       note: "Réduction famille : 15 % sur le 2e membre.",
     },
@@ -270,8 +270,8 @@ export const faq = {
       a: "Non. En coaching individualisé, le programme part de votre niveau. En cours collectif, le coach adapte les exercices pendant la séance.",
     },
     {
-      q: "Quelle différence entre le duo et le cours collectif ?",
-      a: "En duo, chacun suit son propre programme : le suivi reste individualisé, vous partagez seulement la salle, ce qui réduit le coût par personne. En cours collectif, le programme est commun au groupe, jusqu'à huit personnes.",
+      q: "Quelle différence entre la salle partagée et le cours collectif ?",
+      a: "En salle partagée, chacun suit son propre programme : le suivi reste individualisé, seul l'espace est partagé, ce qui réduit le coût par personne. En cours collectif, le programme est commun au groupe, jusqu'à huit personnes.",
     },
     {
       q: "Comment je réserve ?",
@@ -279,7 +279,7 @@ export const faq = {
     },
     {
       q: "Et si j'ai un empêchement ?",
-      a: "L'annulation se fait depuis votre espace, au minimum 24 h avant pour les séances individuelles et en duo. Passé ce délai, la séance est décomptée.",
+      a: "L'annulation se fait depuis votre espace, au minimum 24 h avant pour les séances individuelles et en salle partagée. Passé ce délai, la séance est décomptée.",
     },
     {
       q: "Que faut-il apporter ?",
