@@ -25,7 +25,7 @@ attendu écrit dedans. Rien ne casse : vous pouvez en ajouter une à la fois.
 | `espace-massage`           | L'espace massage, la table de soin                     | Carré            |
 | `coaching-individualise`   | Coach et adhérent sur un exercice                      | Paysage 16/9     |
 | `cours-collectif`          | Un cours collectif en petit groupe                     | Paysage 16/9     |
-| `cabinet-osteopathie`      | Le cabinet : table de consultation, ambiance calme     | Paysage 4/3      |
+| `cabinet-osteopathie`      | Kevin en consultation                                  | Paysage 4/3      |
 | `massage-californien`      | Un massage californien en cours                        | Paysage 16/10    |
 | `massage-ayurvedique`      | Un massage ayurvédique en cours                        | Paysage 16/10    |
 | `drainage-lymphatique`     | Un drainage lymphatique en cours                       | Paysage 16/10    |

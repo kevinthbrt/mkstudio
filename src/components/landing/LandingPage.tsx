@@ -241,7 +241,7 @@ export function LandingPage() {
             fallback={<IconVisual icon={Hand} caption="Ostéopathie" size="lg" dark />}
             ratio="4/3"
             sizes="(max-width: 1024px) 100vw, 45vw"
-            label="Cabinet d'ostéopathie : table de consultation, ambiance calme"
+            label="Kevin Thubert en consultation avec un nourrisson"
           />
           <div>
             <SectionHeader eyebrow={osteopathie.eyebrow} title={osteopathie.title} />
