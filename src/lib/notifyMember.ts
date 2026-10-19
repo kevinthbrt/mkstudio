@@ -51,10 +51,11 @@ export function notifyMember(
 /**
  * Send a push notification to every admin. Call from server-side API routes
  * when a member self-initiates an action admins should know about (booking,
- * cancellation). Fire-and-forget (non-blocking).
+ * cancellation). Fire-and-forget (non-blocking) ; la promesse renvoyée peut
+ * être passée à after() pour que Vercel ne coupe pas l'envoi après la réponse.
  */
-export function notifyAdmins(title: string, message: string, url?: string): void {
-  (async () => {
+export function notifyAdmins(title: string, message: string, url?: string): Promise<void> {
+  return (async () => {
     try {
       const adminClient = createAdminClient();
       const { data: adminProfiles } = await adminClient

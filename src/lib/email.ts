@@ -587,3 +587,169 @@ export async function sendMarketingEmail(params: MarketingEmailParams & { to: st
     html,
   });
 }
+
+// ─── Boutique éphémère : confirmation de commande ─────────────────────────────
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function sendMerchOrderConfirmationEmail(params: {
+  to: string;
+  firstName: string;
+  saleTitle: string;
+  closesAt: string;
+  lines: { itemName: string; variant: string | null; quantity: number; unitPrice: number }[];
+  total: number;
+  paymentLabel: string;
+  paymentInstructions: string | null;
+  /** Commande saisie par l'admin à la place de l'adhérent. */
+  byAdmin?: boolean;
+}) {
+  const { to, firstName, saleTitle, closesAt, lines, total, paymentLabel, paymentInstructions, byAdmin } = params;
+  const deadlinePassed = new Date(closesAt) <= new Date();
+  const eur = (amount: number) =>
+    new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
+  const deadline = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  }).format(new Date(closesAt));
+
+  const lineRows = lines
+    .map((line) =>
+      infoRow(
+        `${line.quantity} × ${escapeHtml(line.itemName)}${line.variant ? ` (${escapeHtml(line.variant)})` : ""}`,
+        eur(line.quantity * line.unitPrice)
+      )
+    )
+    .join("");
+
+  const html = layout(`
+    <div style="display:inline-block;background:#D4AF3722;border:1px solid #D4AF3744;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#D4AF37;font-size:13px;font-weight:600;">Commande enregistrée</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${escapeHtml(saleTitle)}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${escapeHtml(firstName)}, ${byAdmin ? "l'équipe MK Studio a enregistré cette commande pour toi." : "ta commande a bien été enregistrée."}</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${lineRows}
+      ${infoRow("<strong>Total</strong>", `<strong>${eur(total)}</strong>`)}
+      ${infoRow("Règlement", escapeHtml(paymentLabel))}
+    </table>
+    ${divider()}
+    ${paymentInstructions
+      ? `<p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 16px;white-space:pre-line;">${escapeHtml(paymentInstructions)}</p>`
+      : ""}
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 24px;">
+      ${deadlinePassed
+        ? "Les commandes sont groupées : nous passons bientôt la commande auprès du fournisseur, puis nous te remettons tes articles à la salle."
+        : `Les commandes sont groupées : nous passons commande auprès du fournisseur après le ${deadline}, puis nous te remettons tes articles à la salle.
+      Tu peux annuler depuis ton espace jusqu'à cette date, tant que la commande n'est pas réglée.`}
+    </p>
+    <div style="text-align:center;">
+      ${btn("Voir mes commandes", `${SITE_URL}/dashboard/boutique`)}
+    </div>
+  `);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: `Commande enregistrée : ${saleTitle}`,
+    html,
+  });
+}
+
+// ─── Envoi groupé (jusqu'à 100 emails par requête Resend) ─────────────────────
+// Évite la limite de requêtes par seconde de Resend lors d'un envoi à tous les
+// adhérents. Renvoie le nombre d'emails acceptés par Resend.
+export async function sendEmailBatch(messages: { to: string; subject: string; html: string }[]): Promise<number> {
+  const resend = getResend();
+  let accepted = 0;
+
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100);
+    const result = await resend.batch.send(chunk.map((m) => ({ from: FROM, ...m })));
+    if (result.error) {
+      console.error("[email] Resend batch error:", result.error, "| lot de", chunk.length);
+      continue;
+    }
+    accepted += chunk.length;
+  }
+
+  return accepted;
+}
+
+// ─── Boutique éphémère : commande modifiée par l'admin ────────────────────────
+export async function sendMerchOrderUpdatedEmail(params: {
+  to: string;
+  firstName: string;
+  saleTitle: string;
+  lines: { itemName: string; variant: string | null; quantity: number; unitPrice: number }[];
+  total: number;
+  paymentLabel: string;
+  paymentInstructions: string | null;
+  /** Montant déjà encaissé, si la commande était réglée. */
+  paidAmount: number | null;
+  contactPhone: string;
+}) {
+  const { to, firstName, saleTitle, lines, total, paymentLabel, paymentInstructions, paidAmount, contactPhone } = params;
+  const eur = (amount: number) =>
+    new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
+  const gap = paidAmount === null ? 0 : Math.round((total - paidAmount) * 100) / 100;
+
+  const lineRows = lines
+    .map((line) =>
+      infoRow(
+        `${line.quantity} × ${escapeHtml(line.itemName)}${line.variant ? ` (${escapeHtml(line.variant)})` : ""}`,
+        eur(line.quantity * line.unitPrice)
+      )
+    )
+    .join("");
+
+  const paymentNote =
+    paidAmount !== null && gap > 0
+      ? `Tu as déjà réglé ${eur(paidAmount)} : il reste <strong style="color:#ffffff;">${eur(gap)}</strong> à régler.`
+      : paidAmount !== null && gap < 0
+      ? `Tu as déjà réglé ${eur(paidAmount)} : nous te rembourserons <strong style="color:#ffffff;">${eur(-gap)}</strong> à la salle.`
+      : null;
+
+  const html = layout(`
+    <div style="display:inline-block;background:#D4AF3722;border:1px solid #D4AF3744;border-radius:8px;padding:6px 14px;margin-bottom:20px;">
+      <span style="color:#D4AF37;font-size:13px;font-weight:600;">Commande modifiée</span>
+    </div>
+    <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;">${escapeHtml(saleTitle)}</h1>
+    <p style="color:#9ca3af;font-size:14px;margin:0 0 24px;">Bonjour ${escapeHtml(firstName)}, ta commande a été modifiée. Voici ton nouveau récapitulatif.</p>
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0">
+      ${lineRows}
+      ${infoRow("<strong>Total</strong>", `<strong>${eur(total)}</strong>`)}
+      ${infoRow("Règlement", escapeHtml(paymentLabel))}
+    </table>
+    ${divider()}
+    ${paymentNote ? `<p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 16px;">${paymentNote}</p>` : ""}
+    ${paidAmount === null && paymentInstructions
+      ? `<p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 16px;white-space:pre-line;">${escapeHtml(paymentInstructions)}</p>`
+      : ""}
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0 0 24px;">
+      Si quelque chose ne correspond pas, préviens-nous à la salle ou au ${escapeHtml(contactPhone).replace(/ /g, "&nbsp;")}.
+    </p>
+    <div style="text-align:center;margin-bottom:24px;">
+      ${btn("Voir mes commandes", `${SITE_URL}/dashboard/boutique`)}
+    </div>
+    <p style="color:#d1d5db;font-size:14px;line-height:1.7;margin:0;">À bientôt à la salle,<br/>Manon</p>
+  `);
+
+  return sendEmail({
+    from: FROM,
+    to,
+    subject: `Ta commande a été modifiée : ${saleTitle}`,
+    html,
+  });
+}
