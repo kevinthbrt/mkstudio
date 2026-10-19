@@ -30,7 +30,6 @@ import {
   finalCta,
   footer,
   hero,
-  highlights,
   massages,
   osteopathie,
   tarifs,
@@ -139,19 +138,6 @@ export function LandingPage() {
               />
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------ Chiffres */}
-      <section className="border-b border-[#ECEAE3] bg-white">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-3">
-          {highlights.map((item) => (
-            <div key={item.label} className="flex flex-col">
-              <span className="text-3xl font-bold tracking-tight text-[#14131A]">{item.value}</span>
-              <span className="mt-1 text-sm font-semibold text-[#14131A]">{item.label}</span>
-              <span className="mt-0.5 text-sm text-[#8A8470]">{item.detail}</span>
-            </div>
-          ))}
         </div>
       </section>
 

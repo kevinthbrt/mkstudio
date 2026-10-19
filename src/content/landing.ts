@@ -31,24 +31,6 @@ export const hero = {
   ],
 };
 
-export const highlights = [
-  {
-    value: "8",
-    label: "personnes maximum",
-    detail: "En cours collectif",
-  },
-  {
-    value: "12 €",
-    label: "le cours collectif",
-    detail: "100 € le carnet de 10 séances",
-  },
-  {
-    value: "-15 %",
-    label: "sur les massages",
-    detail: "Pour les adhérents avec séances en cours",
-  },
-];
-
 export const coaching = {
   eyebrow: "Coaching",
   title: "Deux façons de s'entraîner",
