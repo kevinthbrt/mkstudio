@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Droplets,
-  Dumbbell,
   Flower2,
   Hand,
   HandHeart,
@@ -125,11 +124,11 @@ export function LandingPage() {
             />
             <div className="grid grid-cols-2 gap-4">
               <Illustration
-                name="espace-entrainement"
-                fallback={<IconVisual icon={Dumbbell} caption="Coaching" />}
+                name="vignette-osteopathie"
+                fallback={<IconVisual icon={Hand} caption="Ostéopathie" />}
                 ratio="1/1"
                 sizes="(max-width: 1024px) 50vw, 22vw"
-                label="L'espace d'entraînement, côté vitrine"
+                label="Le cabinet d'ostéopathie"
               />
               <Illustration
                 name="espace-massage"

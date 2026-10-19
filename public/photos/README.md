@@ -21,7 +21,7 @@ attendu écrit dedans. Rien ne casse : vous pouvez en ajouter une à la fois.
 | Nom du fichier             | Ce que la photo doit montrer                          | Format conseillé |
 | -------------------------- | ----------------------------------------------------- | ---------------- |
 | `salle`                    | Vue d'ensemble de la salle, en lumière naturelle       | Paysage 4/3      |
-| `espace-entrainement`      | L'espace d'entraînement, côté vitrine                  | Carré            |
+| `vignette-osteopathie`     | Le cabinet d'ostéopathie, en haut de page              | Carré            |
 | `espace-massage`           | L'espace massage, la table de soin                     | Carré            |
 | `coaching-individualise`   | Coach et adhérent sur un exercice                      | Paysage 16/9     |
 | `cours-collectif`          | Un cours collectif en petit groupe                     | Paysage 16/9     |
