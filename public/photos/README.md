@@ -21,7 +21,7 @@ attendu écrit dedans. Rien ne casse : vous pouvez en ajouter une à la fois.
 | Nom du fichier             | Ce que la photo doit montrer                          | Format conseillé |
 | -------------------------- | ----------------------------------------------------- | ---------------- |
 | `salle`                    | Vue d'ensemble de la salle, en lumière naturelle       | Paysage 4/3      |
-| `coach-cours-collectif`    | Le coach pendant un cours collectif                    | Carré            |
+| `espace-entrainement`      | L'espace d'entraînement, côté vitrine                  | Carré            |
 | `espace-massage`           | L'espace massage, la table de soin                     | Carré            |
 | `coaching-individualise`   | Coach et adhérent sur un exercice                      | Paysage 16/9     |
 | `cours-collectif`          | Un cours collectif en petit groupe                     | Paysage 16/9     |

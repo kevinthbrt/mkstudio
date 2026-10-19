@@ -121,15 +121,15 @@ export function LandingPage() {
               ratio="4/3"
               priority
               sizes="(max-width: 1024px) 100vw, 45vw"
-              label="Photo principale : vue d'ensemble de la salle, lumière naturelle"
+              label="Vue d'ensemble de la salle MK Studio"
             />
             <div className="grid grid-cols-2 gap-4">
               <Illustration
-                name="coach-cours-collectif"
+                name="espace-entrainement"
                 fallback={<IconVisual icon={Dumbbell} caption="Coaching" />}
                 ratio="1/1"
                 sizes="(max-width: 1024px) 50vw, 22vw"
-                label="Coach pendant un cours collectif"
+                label="L'espace d'entraînement, côté vitrine"
               />
               <Illustration
                 name="espace-massage"
