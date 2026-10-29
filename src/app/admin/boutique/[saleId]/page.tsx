@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -32,9 +31,11 @@ import { SaleFormModal, type SaleFormValues } from "@/components/boutique/SaleFo
 import { ItemFormModal, type ItemFormValues } from "@/components/boutique/ItemFormModal";
 import { AnnounceModal } from "@/components/boutique/AnnounceModal";
 import { AdminOrderModal } from "@/components/boutique/AdminOrderModal";
+import { ItemGallery } from "@/components/boutique/ItemGallery";
 import {
   buildMerchRecap,
   isMerchSaleOpen,
+  merchItemImages,
   merchPaymentGap,
   merchPaymentLabel,
   merchSaleStatusLabel,
@@ -470,14 +471,8 @@ export default function AdminSalePage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((item) => (
                 <Card key={item.id} className={cn("overflow-hidden", !item.active && "opacity-50")}>
-                  <div className="relative aspect-square bg-[#13121e]">
-                    {item.image_url ? (
-                      <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-gray-700">
-                        <Package size={36} />
-                      </div>
-                    )}
+                  <div className="relative">
+                    <ItemGallery images={merchItemImages(item)} alt={item.name} className="aspect-square" />
                     {!item.active && (
                       <span className="absolute left-3 top-3 rounded-lg bg-black/70 px-2 py-1 text-xs font-semibold text-gray-300">
                         Masqué
