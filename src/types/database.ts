@@ -458,6 +458,7 @@ export interface Database {
           description: string | null;
           price: number;
           image_url: string | null;
+          images: string[];
           variants: string[];
           position: number;
           active: boolean;
@@ -471,6 +472,7 @@ export interface Database {
           description?: string | null;
           price: number;
           image_url?: string | null;
+          images?: string[];
           variants?: string[];
           position?: number;
           active?: boolean;
@@ -480,6 +482,7 @@ export interface Database {
           description?: string | null;
           price?: number;
           image_url?: string | null;
+          images?: string[];
           variants?: string[];
           position?: number;
           active?: boolean;

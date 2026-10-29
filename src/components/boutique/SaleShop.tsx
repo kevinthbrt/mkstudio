@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { CalendarClock, ChevronDown, Minus, Package, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronDown, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ItemGallery } from "@/components/boutique/ItemGallery";
 import { Textarea } from "@/components/ui/Input";
-import { MERCH_PAYMENT_METHODS, timeLeftLabel, type MerchPaymentMethod } from "@/lib/merch";
+import { MERCH_PAYMENT_METHODS, merchItemImages, timeLeftLabel, type MerchPaymentMethod } from "@/lib/merch";
 import { cn, formatDateTime, formatPriceFromEuros } from "@/lib/utils";
 import type { MerchItem, MerchSale } from "@/types/database";
 
@@ -27,15 +27,7 @@ function ItemCard({ item, onAdd }: { item: MerchItem; onAdd: (variant: string | 
 
   return (
     <Card className="flex flex-col overflow-hidden">
-      <div className="relative aspect-[4/3] bg-[#13121e] sm:aspect-square">
-        {item.image_url ? (
-          <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[#D4AF37]/30">
-            <Package size={44} strokeWidth={1.4} />
-          </div>
-        )}
-      </div>
+      <ItemGallery images={merchItemImages(item)} alt={item.name} className="aspect-[4/3] sm:aspect-square" />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
           <p className="font-semibold text-white">{item.name}</p>

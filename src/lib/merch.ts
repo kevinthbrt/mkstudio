@@ -166,3 +166,15 @@ export function merchPaymentGap(order: Pick<MerchOrder, "paid_at" | "paid_amount
   if (!order.paid_at || order.paid_amount === null) return 0;
   return Math.round((Number(order.total) - Number(order.paid_amount)) * 100) / 100;
 }
+
+/** Nombre maximum de photos par article. */
+export const MERCH_MAX_IMAGES = 6;
+
+/**
+ * Photos d'un article dans l'ordre d'affichage, la principale en premier.
+ * Les articles créés avant l'ajout de la galerie n'ont que image_url.
+ */
+export function merchItemImages(item: Pick<MerchItem, "images" | "image_url">): string[] {
+  if (item.images?.length) return item.images;
+  return item.image_url ? [item.image_url] : [];
+}
