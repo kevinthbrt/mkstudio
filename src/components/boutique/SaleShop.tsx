@@ -27,7 +27,7 @@ function ItemCard({ item, onAdd }: { item: MerchItem; onAdd: (variant: string | 
 
   return (
     <Card className="flex flex-col overflow-hidden">
-      <ItemGallery images={merchItemImages(item)} alt={item.name} className="aspect-[4/3] sm:aspect-square" />
+      <ItemGallery images={merchItemImages(item)} alt={item.name} className="aspect-square" />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
           <p className="font-semibold text-white">{item.name}</p>
