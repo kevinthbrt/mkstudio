@@ -41,13 +41,14 @@ export function ItemGallery({ images, alt, className }: { images: string[]; alt:
         className="flex h-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {images.map((src, i) => (
-          <div key={src} className="relative h-full w-full flex-shrink-0 snap-center">
+          <div key={src} className="relative h-full w-full flex-shrink-0 snap-center bg-white">
+            {/* object-contain : le vêtement reste entier, quel que soit le format de la photo. */}
             <Image
               src={src}
               alt={images.length > 1 ? `${alt} (photo ${i + 1} sur ${images.length})` : alt}
               fill
               sizes="(max-width: 640px) 100vw, 33vw"
-              className="object-cover"
+              className="object-contain"
             />
           </div>
         ))}
@@ -78,8 +79,8 @@ export function ItemGallery({ images, alt, className }: { images: string[]; alt:
               <span
                 key={src}
                 className={cn(
-                  "h-1.5 rounded-full shadow transition-all",
-                  i === index ? "w-4 bg-white" : "w-1.5 bg-white/55"
+                  "h-1.5 rounded-full transition-all",
+                  i === index ? "w-4 bg-[#14131A]/80" : "w-1.5 bg-[#14131A]/25"
                 )}
               />
             ))}
